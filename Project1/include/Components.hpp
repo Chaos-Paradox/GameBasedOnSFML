@@ -79,10 +79,14 @@ public:
 
 class SpriteComponent {
 public:
-    sf::Texture tex;
+    sf::Texture tex;        // 指向纹理
+    float flipX = 1.f;      // 水平翻转方向：1 或 -1
 
     SpriteComponent() = default;                                // 必须有
-    SpriteComponent(sf::Texture& tx) { tex = tx; }
+    SpriteComponent(sf::Texture& tx) {
+        tex = tx; 
+        flipX = 1.f;
+    }
     // 删除拷贝
     //SpriteComponent(const SpriteComponent&) = delete;
     //SpriteComponent& operator=(const SpriteComponent&) = delete;
@@ -90,6 +94,24 @@ public:
     // 默认移动
     //SpriteComponent(SpriteComponent&&) noexcept = default;
     //SpriteComponent& operator=(SpriteComponent&&) noexcept = default;
+};
+
+class CameraComponent {
+public:
+//struct CameraComponent {
+    // 当前视图中心（世界坐标）
+    sf::Vector2f center = { 0.f, 0.f };
+    // 最大偏移量（像素）
+    sf::Vector2f maxOffset = { 100.f, 50.f };
+};
+
+// 标记这是蝙蝠
+struct BatTag { };
+
+// AI 组件：追击速度
+class ChaseComponent {
+public:
+    float speed = 100.f;
 };
 
 //class Health {

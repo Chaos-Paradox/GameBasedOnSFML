@@ -16,8 +16,24 @@ public:
             if (auto* pos = cm.getComponent<PositionComponent>(e)) {
                 sf::Sprite sprite(sprComp.tex);
                 sprite.setPosition(pos->position);
+                if (auto* vel = cm.getComponent<VelocityComponent>(e)) {
+                    if (vel->velocity.x > 0) {
+                        sprComp.flipX = 1.f;
+                    }
+                    else if (vel->velocity.x < 0) {
+                        sprComp.flipX = -1.f;
+                    }
+                    sprite.setScale({ sprComp.flipX, 1.f });
+                    //sprite.setScale(1.f, 1.f);
+                }
+
+
                 window.draw(sprite);
             }
+
+            //spr->sprite.setScale(1.f, 1.f);
+
+
             });
         window.display();
     }
