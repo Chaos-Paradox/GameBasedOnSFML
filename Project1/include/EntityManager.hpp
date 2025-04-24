@@ -1,29 +1,9 @@
-﻿#pragma once
+﻿
+#pragma once
 #include <unordered_set>
+#include "Entity.hpp"
 
-
-class Entity {
-public:
-    int id;
-    Entity(int id) : id(id) {}
-    bool operator==(const Entity& other) const { return id == other.id; }
-};
-
-//class EntityManager {
-//public:
-//    Entity createEntity();
-//    void destroyEntity(Entity entity);
-//    bool isAlive(Entity entity);
-//
-//    void setComponentManager(ComponentManager* cm) {
-//        componentManager = cm;
-//    }
-//
-//private:
-//    int nextId = 0;
-//    std::unordered_set<int> activeEntities;
-//    ComponentManager* componentManager = nullptr;
-//};
+class ComponentManager; // ✅ 前向声明
 
 //class EntityManager {
 //public:
@@ -50,3 +30,16 @@ public:
 //    int nextId = 0;
 //    ComponentManager& componentManager;  // ✅ 持有引用或指针（解耦）
 //};
+
+class EntityManager {
+public:
+    EntityManager(ComponentManager& cm) : cm(cm) {}
+    Entity create() {
+        Entity e{ nextId++ }; alive.insert(e.id); return e;
+    }
+    bool exists(Entity e) { return alive.count(e.id); }
+private:
+    int nextId = 0;
+    std::unordered_set<int> alive;
+    ComponentManager& cm;
+};

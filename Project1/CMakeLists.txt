@@ -5,13 +5,16 @@ cmake_minimum_required(VERSION 3.10)
 project(Project1)
 
 # 包含头文件目录
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include
+#                    ${CMAKE_CURRENT_SOURCE_DIR}/include/Event
+#                    ${CMAKE_CURRENT_SOURCE_DIR}/include/System
+)
 
 # 查找所有源文件
 file(GLOB SRC_FILES "src/*.cpp")
 
 # 添加主目标（可执行文件或库）
-add_library(${PROJECT_NAME} ${SRC_FILES})  # 如果需要构建库，可以使用 add_library
+add_library(${PROJECT_NAME} STATIC ${SRC_FILES})  # 如果需要构建库，可以使用 add_library
 
 # 链接外部库（SFML 等）
 link_libraries(
@@ -24,6 +27,7 @@ link_libraries(
     winmm
     gdi32
 )
+
 
 # 设置输出目录（可选）
 set_target_properties(${PROJECT_NAME} PROPERTIES
