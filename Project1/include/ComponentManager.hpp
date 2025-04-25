@@ -1,61 +1,21 @@
 ﻿#pragma once
 #include <unordered_map>
+#include <functional>
 #include "Components.hpp"
 #include "Entity.hpp"
-
-//class ComponentManager {
-//public:
-//    ComponentManager() = default; // ✅ 显式构造函数，当前无需额外初始化
-//
-//    template<typename T>
-//    void addComponent(Entity entity, const T& component) {
-//        getComponentMap<T>()[entity.id] = component;
-//    }
-//
-//    template<typename T>
-//    void removeComponent(Entity entity) {
-//        getComponentMap<T>().erase(entity.id);
-//    }
-//
-//    template<typename T>
-//    T* getComponent(Entity entity) {
-//        auto& map = getComponentMap<T>();
-//        auto it = map.find(entity.id);
-//        if (it != map.end()) return &it->second;
-//        return nullptr;
-//    }
-//
-//    template<typename T>
-//    bool hasComponent(Entity entity) {
-//        return getComponentMap<T>().count(entity.id) > 0;
-//    }
-//
-//    void removeAllComponents(Entity entity) {
-//        removeComponent<PositionComponent>(entity);
-//        removeComponent<VelocityComponent>(entity);
-//        removeComponent<CollisionComponent>(entity);
-//    }
-//
-//private:
-//    template<typename T>
-//    std::unordered_map<int, T>& getComponentMap() {
-//        static std::unordered_map<int, T> componentMap;
-//        return componentMap;
-//    }
-//};
-
-
 
 template<typename T>
 using Map = std::unordered_map<int, T>;
 
 class ComponentManager {
 public:
+    // 添加组件
     template<typename T>
     void addComponent(Entity e, T&& comp) {
         get<T>()[e.id] = std::forward<T>(comp);
     }
 
+    // 获取组件
     template<typename T>
     T* getComponent(Entity e) {
         auto& m = get<T>();
@@ -63,6 +23,7 @@ public:
         return it == m.end() ? nullptr : &it->second;
     }
 
+    // 遍历所有组件
     template<typename T>
     void forEach(std::function<void(int, T&)> func) {
         for (auto& [id, comp] : get<T>()) {
@@ -70,10 +31,30 @@ public:
         }
     }
 
+    // 删除与实体相关的所有组件
+    void destroyEntity(Entity e) {
+        // 遍历所有组件类型并删除该实体的相关数据
+        destroyComponent<PositionComponent>(e);
+        destroyComponent<VelocityComponent>(e);
+        destroyComponent<SpriteComponent>(e);
+        destroyComponent<HealthComponent>(e);
+        destroyComponent<DamageFlashComponent>(e);
+        destroyComponent<EnemyTag>(e);
+        // 其他组件类型也可以继续添加
+    }
+
 private:
+    // 获取特定类型的组件容器
     template<typename T>
     Map<T>& get() {
         static Map<T> m;
         return m;
+    }
+
+    // 删除某个组件类型的某个实体的数据
+    template<typename T>
+    void destroyComponent(Entity e) {
+        auto& map = get<T>();
+        map.erase(e.id);
     }
 };

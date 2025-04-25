@@ -106,7 +106,9 @@ public:
 };
 
 // 标记这是蝙蝠
-struct BatTag { };
+//struct BatTag { };
+
+struct EnemyTag {};  // 标记怪物
 
 // AI 组件：追击速度
 class ChaseComponent {
@@ -114,15 +116,32 @@ public:
     float speed = 100.f;
 };
 
-//class Health {
-//public:
-//    float health;
-//    float recovery;
-//
-//    Health() = default;
-//    Health(float hp, float rec) :health(hp), recovery(rec){};
-//
-//};
+class HealthComponent {
+public:
+    int hp;
+    int maxHp;
+};
+
+class DamageFlashComponent {
+public:
+    float timer = 0.f;         // 闪烁剩余时间
+    float totalDuration = 0.5f; // 总闪烁时间
+    bool visible = true;       // 是否可见
+};
+
+
+enum class Faction {
+    Player,
+    Enemy,
+    Neutral,
+    Ally
+};
+
+struct FactionComponent {
+    Faction faction;
+};
+
+
 
 //class StateComponent {
 //public:

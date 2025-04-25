@@ -15,7 +15,14 @@
 //    std::function<void(EntityManager&, ComponentManager&, Entity)> initializer;
 //};
 
+
+
+//struct SpawnConfig {
+//    float minRadius, maxRadius;
+//    std::function<void(Entity)> initializer;
+//};
+
 struct SpawnConfig {
     float minRadius, maxRadius;
-    std::function<void(Entity)> initializer;
+    std::function<void(EntityManager&, ComponentManager&, Entity)> initializer;
 };

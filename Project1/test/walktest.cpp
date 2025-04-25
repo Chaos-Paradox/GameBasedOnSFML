@@ -10,6 +10,7 @@
 #include <Systems/CameraSystem.hpp>
 #include <Systems/SpawnerSystem.hpp>
 #include <Systems/ChaseSystem.hpp>
+#include <Systems/CombatSystem.hpp>
 //#include <Systems/FlipSystem.hpp>
 
 int main() {
@@ -22,6 +23,7 @@ int main() {
     Entity player = em.create();
     cm.addComponent<PositionComponent>(player, { PositionComponent(400,300) });
     cm.addComponent<VelocityComponent>(player, { VelocityComponent(0,0) });
+    cm.addComponent<HealthComponent>(player, { HealthComponent{ 100, 100 } });
     sf::Texture tex;
     if (!tex.loadFromFile(".\\material\\pictures\\guy.png")) {
         // 错误处理：文件不存在或格式不支持
@@ -41,17 +43,26 @@ int main() {
     SpawnerSystem spawner(em, cm, player, window);
 
     spawner.addConfig({ 200,300,
-        [&](Entity e) {
+        [&](EntityManager em, ComponentManager cm ,Entity e) {
             cm.addComponent<SpriteComponent>(e,SpriteComponent(batTex));
             cm.addComponent<ChaseComponent>(e,{120});
+            cm.addComponent<HealthComponent>(e, HealthComponent{ 100, 100 });
+            cm.addComponent<DamageFlashComponent>(e, {});
+            cm.addComponent<EnemyTag>(e, {});
         }
         });
     spawner.addConfig({ 150,250,
-        [&](Entity e) {
+        [&](EntityManager em, ComponentManager cm ,Entity e) {
             cm.addComponent<SpriteComponent>(e,SpriteComponent(duckTex));
             cm.addComponent<ChaseComponent>(e,{80});
+            cm.addComponent<HealthComponent>(e, HealthComponent{ 100, 100 });
+            cm.addComponent<DamageFlashComponent>(e, {});
+            cm.addComponent<EnemyTag>(e, {});
         }
         });
+
+
+
 
 
     // 系统
@@ -65,6 +76,7 @@ int main() {
     cm.addComponent<CameraComponent>(player, CameraComponent{});
     // 创建 CameraSystem
     CameraSystem camera(window, cm, player);
+    CombatSystem combatSystem(cm, player);
 
     sf::Clock clock;
     while (window.isOpen()) {
@@ -82,7 +94,7 @@ int main() {
         //flip.update();
 
 
-        
+        combatSystem.update();
         camera.update(dt);
         chase.update(dt);
         

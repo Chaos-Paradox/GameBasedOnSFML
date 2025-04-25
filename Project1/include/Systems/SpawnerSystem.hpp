@@ -34,7 +34,7 @@ public:
             Entity e = em.create();
             cm.addComponent<PositionComponent>(e, PositionComponent{ pos });
             cm.addComponent<VelocityComponent>(e, VelocityComponent{ {0,0} });
-            cfg.initializer(e);
+            cfg.initializer(em, cm, e);
         }
     }
 

@@ -1,0 +1,38 @@
+// EntityFactory.hpp
+#pragma once
+#include "EntityManager.hpp"
+#include "ComponentManager.hpp"
+#include "Components.hpp"
+#include <unordered_map>
+#include <functional>
+#include <string>
+
+class EntityFactory {
+public:
+    using Creator = std::function<void(EntityManager&, ComponentManager&, Entity, const sf::Vector2f&)>;
+
+    static EntityFactory& instance() {
+        static EntityFactory inst;
+        return inst;
+    }
+
+    void registerType(const std::string& name, Creator creator) {
+        creators[name] = creator;
+    }
+
+    Entity create(const std::string& name,
+                  EntityManager& em,
+                  ComponentManager& cm,
+                  const sf::Vector2f& position) {
+        auto it = creators.find(name);
+        if (it == creators.end()) throw std::runtime_error("Entity type not registered: " + name);
+        Entity e = em.create();
+        cm.addComponent<PositionComponent>(e, { position });
+        cm.addComponent<VelocityComponent>(e, { {0, 0} });
+        it->second(em, cm, e, position);
+        return e;
+    }
+
+private:
+    std::unordered_map<std::string, Creator> creators;
+};
