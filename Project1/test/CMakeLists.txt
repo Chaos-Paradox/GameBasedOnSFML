@@ -8,3 +8,6 @@ target_link_libraries("test2" Project1)
 
 add_executable("walktest" "walktest.cpp")
 target_link_libraries("walktest" Project1)
+
+add_executable("tmptest" "tmptest.cpp")
+target_link_libraries("tmptest" Project1)
