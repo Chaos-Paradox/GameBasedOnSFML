@@ -73,3 +73,4 @@ link_libraries(
 #)
 
 add_subdirectory(Project1)
+add_subdirectory(Project2)
