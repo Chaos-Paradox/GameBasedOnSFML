@@ -19,14 +19,14 @@ int main() {
     ComponentManager cm;
     EntityManager em(cm);
 
-    // ´´½¨Íæ¼ÒÊµÌå
+    // Êµ
     Entity player = em.create();
     cm.addComponent<PositionComponent>(player, { PositionComponent(400,300) });
     cm.addComponent<VelocityComponent>(player, { VelocityComponent(0,0) });
     cm.addComponent<HealthComponent>(player, { HealthComponent{ 100, 100 } });
     sf::Texture tex;
     if (!tex.loadFromFile("material/pictures/guy.png")) {
-        // ´íÎó´¦Àí£ºÎÄ¼ş²»´æÔÚ»ò¸ñÊ½²»Ö§³Ö
+        // Ä¼Ú»Ê½Ö§
         std::cerr << "Failed to load texture\n";
     }
 
@@ -72,12 +72,13 @@ int main() {
     InputSystem input(cm, player);
     //FlipSystem flip(cm);
     
-    // Ìí¼Ó CameraComponent ¸øÍæ¼Ò
+    //  CameraComponent 
     cm.addComponent<CameraComponent>(player, CameraComponent{});
-    // ´´½¨ CameraSystem
+    //  CameraSystem
     CameraSystem camera(window, cm, player);
     CombatSystem combatSystem(cm, player);
 
+    bool gameOver = false;
     sf::Clock clock;
     while (window.isOpen()) {
         while (const std::optional event = window.pollEvent()) {
@@ -96,9 +97,16 @@ int main() {
 
 
         combatSystem.update();
+        
+        // æ£€æŸ¥ç©å®¶æ˜¯å¦æ­»äº¡
+        auto* playerHealth = cm.getComponent<HealthComponent>(player);
+        if (playerHealth && playerHealth->hp <= 0) {
+            std::cout << "Game Over! Closing window...\n";
+            break;  // ç«‹å³é€€å‡ºæ¸¸æˆå¾ªç¯
+        }
+        
         camera.update(dt);
         chase.update(dt);
-        
         render.update();
         
     }
