@@ -188,16 +188,16 @@ void only_sfml() {
         }
 
         // Apply acceleration based on input
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Left)) {
             accelerations[player].ax = -300.0f;
         }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Right)) {
             accelerations[player].ax = 300.0f;
         }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Up)) {
             accelerations[player].ay = -300.0f;
         }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Down)) {
             accelerations[player].ay = 300.0f;
         }
 
