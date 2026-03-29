@@ -25,14 +25,14 @@ int main() {
     cm.addComponent<VelocityComponent>(player, { VelocityComponent(0,0) });
     cm.addComponent<HealthComponent>(player, { HealthComponent{ 100, 100 } });
     sf::Texture tex;
-    if (!tex.loadFromFile(".\\material\\pictures\\guy.png")) {
+    if (!tex.loadFromFile("material/pictures/guy.png")) {
         // 错误处理：文件不存在或格式不支持
         std::cerr << "Failed to load texture\n";
     }
 
     sf::Texture batTex, duckTex;
-    batTex.loadFromFile(".\\material\\pictures\\bat.png");
-    duckTex.loadFromFile(".\\material\\pictures\\ducky.png");
+    batTex.loadFromFile("material/pictures/bat.png");
+    duckTex.loadFromFile("material/pictures/ducky.png");
 
     //sf::Sprite sprite(tex);
     //sprite.setTexture(tex);
