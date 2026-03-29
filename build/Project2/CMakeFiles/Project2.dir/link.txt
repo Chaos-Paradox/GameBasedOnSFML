@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../lib/libProject2.a CMakeFiles/Project2.dir/src/tools.cpp.o
+/usr/bin/ranlib ../lib/libProject2.a

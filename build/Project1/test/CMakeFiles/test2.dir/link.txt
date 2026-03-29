@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/test2.dir/test2.cpp.o -o ../../bin/test2  -Wl,-rpath,/opt/homebrew/lib ../../lib/libProject1.a /opt/homebrew/lib/libsfml-graphics.3.0.2.dylib /opt/homebrew/lib/libsfml-audio.3.0.2.dylib /opt/homebrew/lib/libsfml-window.3.0.2.dylib /opt/homebrew/lib/libsfml-system.3.0.2.dylib

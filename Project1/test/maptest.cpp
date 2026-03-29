@@ -7,7 +7,7 @@
 int main() {
     sf::RenderWindow window(sf::VideoMode({ 640, 480 }), "TileMap Test");
     sf::Texture tileset;
-    tileset.loadFromFile(".\\material\\pictures\\glass.png");
+    tileset.loadFromFile("../material/pictures/glass.png");
 
     TileMap map;
     map.loadFromCSV("map.csv");

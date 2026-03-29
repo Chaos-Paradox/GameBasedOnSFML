@@ -1,0 +1,11 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/cmake_install.cmake",
+		"/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project1/cmake_install.cmake",
+		"/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project1/test/cmake_install.cmake",
+		"/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2/cmake_install.cmake",
+		"/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2/test/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
