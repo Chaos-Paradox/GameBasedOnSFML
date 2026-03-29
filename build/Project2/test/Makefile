@@ -57,10 +57,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/pioneer/.openclaw/workspace/GameBasedOnSFML
+CMAKE_SOURCE_DIR = /Users/pioneer/.openclaw/workspace/SFMLGame
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build
+CMAKE_BINARY_DIR = /Users/pioneer/.openclaw/workspace/SFMLGame/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -87,14 +87,14 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(CMAKE_COMMAND) -E cmake_progress_start /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/CMakeFiles /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2/test//CMakeFiles/progress.marks
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project2/test/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/CMakeFiles 0
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(CMAKE_COMMAND) -E cmake_progress_start /Users/pioneer/.openclaw/workspace/SFMLGame/build/CMakeFiles /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2/test//CMakeFiles/progress.marks
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project2/test/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/pioneer/.openclaw/workspace/SFMLGame/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project2/test/clean
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project2/test/clean
 .PHONY : clean
 
 # The main clean target
@@ -103,22 +103,22 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project2/test/preinstall
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project2/test/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project2/test/preinstall
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project2/test/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
 # Convenience name for target.
 Project2/test/CMakeFiles/attack_test.dir/rule:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project2/test/CMakeFiles/attack_test.dir/rule
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project2/test/CMakeFiles/attack_test.dir/rule
 .PHONY : Project2/test/CMakeFiles/attack_test.dir/rule
 
 # Convenience name for target.
@@ -127,7 +127,7 @@ attack_test: Project2/test/CMakeFiles/attack_test.dir/rule
 
 # fast build rule for target.
 attack_test/fast:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project2/test/CMakeFiles/attack_test.dir/build.make Project2/test/CMakeFiles/attack_test.dir/build
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project2/test/CMakeFiles/attack_test.dir/build.make Project2/test/CMakeFiles/attack_test.dir/build
 .PHONY : attack_test/fast
 
 attack_test.o: attack_test.cpp.o
@@ -135,7 +135,7 @@ attack_test.o: attack_test.cpp.o
 
 # target to build an object file
 attack_test.cpp.o:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project2/test/CMakeFiles/attack_test.dir/build.make Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project2/test/CMakeFiles/attack_test.dir/build.make Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o
 .PHONY : attack_test.cpp.o
 
 attack_test.i: attack_test.cpp.i
@@ -143,7 +143,7 @@ attack_test.i: attack_test.cpp.i
 
 # target to preprocess a source file
 attack_test.cpp.i:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project2/test/CMakeFiles/attack_test.dir/build.make Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.i
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project2/test/CMakeFiles/attack_test.dir/build.make Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.i
 .PHONY : attack_test.cpp.i
 
 attack_test.s: attack_test.cpp.s
@@ -151,7 +151,7 @@ attack_test.s: attack_test.cpp.s
 
 # target to generate assembly for a file
 attack_test.cpp.s:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project2/test/CMakeFiles/attack_test.dir/build.make Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.s
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project2/test/CMakeFiles/attack_test.dir/build.make Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.s
 .PHONY : attack_test.cpp.s
 
 # Help Target
@@ -177,6 +177,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

@@ -53,10 +53,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/pioneer/.openclaw/workspace/GameBasedOnSFML
+CMAKE_SOURCE_DIR = /Users/pioneer/.openclaw/workspace/SFMLGame
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build
+CMAKE_BINARY_DIR = /Users/pioneer/.openclaw/workspace/SFMLGame/build
 
 # Include any dependencies generated for this target.
 include Project1/test/CMakeFiles/walktest.dir/depend.make
@@ -73,18 +73,18 @@ Project1/test/CMakeFiles/walktest.dir/codegen:
 .PHONY : Project1/test/CMakeFiles/walktest.dir/codegen
 
 Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o: Project1/test/CMakeFiles/walktest.dir/flags.make
-Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o: /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/test/walktest.cpp
+Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o: /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/test/walktest.cpp
 Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o: Project1/test/CMakeFiles/walktest.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project1/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o -MF CMakeFiles/walktest.dir/walktest.cpp.o.d -o CMakeFiles/walktest.dir/walktest.cpp.o -c /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/test/walktest.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/pioneer/.openclaw/workspace/SFMLGame/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o"
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project1/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o -MF CMakeFiles/walktest.dir/walktest.cpp.o.d -o CMakeFiles/walktest.dir/walktest.cpp.o -c /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/test/walktest.cpp
 
 Project1/test/CMakeFiles/walktest.dir/walktest.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/walktest.dir/walktest.cpp.i"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project1/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/test/walktest.cpp > CMakeFiles/walktest.dir/walktest.cpp.i
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project1/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/test/walktest.cpp > CMakeFiles/walktest.dir/walktest.cpp.i
 
 Project1/test/CMakeFiles/walktest.dir/walktest.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/walktest.dir/walktest.cpp.s"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project1/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/test/walktest.cpp -o CMakeFiles/walktest.dir/walktest.cpp.s
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project1/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/test/walktest.cpp -o CMakeFiles/walktest.dir/walktest.cpp.s
 
 # Object files for target walktest
 walktest_OBJECTS = \
@@ -101,18 +101,18 @@ bin/walktest: /opt/homebrew/lib/libsfml-audio.3.0.2.dylib
 bin/walktest: /opt/homebrew/lib/libsfml-window.3.0.2.dylib
 bin/walktest: /opt/homebrew/lib/libsfml-system.3.0.2.dylib
 bin/walktest: Project1/test/CMakeFiles/walktest.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable ../../bin/walktest"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project1/test && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/walktest.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/pioneer/.openclaw/workspace/SFMLGame/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable ../../bin/walktest"
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project1/test && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/walktest.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 Project1/test/CMakeFiles/walktest.dir/build: bin/walktest
 .PHONY : Project1/test/CMakeFiles/walktest.dir/build
 
 Project1/test/CMakeFiles/walktest.dir/clean:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project1/test && $(CMAKE_COMMAND) -P CMakeFiles/walktest.dir/cmake_clean.cmake
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project1/test && $(CMAKE_COMMAND) -P CMakeFiles/walktest.dir/cmake_clean.cmake
 .PHONY : Project1/test/CMakeFiles/walktest.dir/clean
 
 Project1/test/CMakeFiles/walktest.dir/depend:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /Users/pioneer/.openclaw/workspace/GameBasedOnSFML /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/test /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project1/test /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project1/test/CMakeFiles/walktest.dir/DependInfo.cmake "--color=$(COLOR)" walktest
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /Users/pioneer/.openclaw/workspace/SFMLGame /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/test /Users/pioneer/.openclaw/workspace/SFMLGame/build /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project1/test /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project1/test/CMakeFiles/walktest.dir/DependInfo.cmake "--color=$(COLOR)" walktest
 .PHONY : Project1/test/CMakeFiles/walktest.dir/depend
 

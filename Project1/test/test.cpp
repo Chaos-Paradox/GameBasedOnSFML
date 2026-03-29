@@ -167,20 +167,20 @@ void only_sfml() {
             }
             //else if (const auto* keyPressed = event->getIf<sf::Event::KeyPressed>()) {
             //    // °´¼üÊÂ¼þ
-            //    if (keyPressed->scancode == sf::Keyboard::Scancode::Left) {
+            //    if (keyPressed->scancode == sf::Keyboard::Scan::Left) {
             //        std::cout << "left" << std::endl;
             //        accelerations[player].ax = -300.0f;
             //        break;
             //    }
-            //    if (keyPressed->scancode == sf::Keyboard::Scancode::Right) {
+            //    if (keyPressed->scancode == sf::Keyboard::Scan::Right) {
             //        accelerations[player].ax = 300.0f;
             //        break;
             //    }
-            //    if (keyPressed->scancode == sf::Keyboard::Scancode::Up) {
+            //    if (keyPressed->scancode == sf::Keyboard::Scan::Up) {
             //        accelerations[player].ay = -300.0f;
             //        break;
             //    }
-            //    if (keyPressed->scancode == sf::Keyboard::Scancode::Down) {
+            //    if (keyPressed->scancode == sf::Keyboard::Scan::Down) {
             //        accelerations[player].ay = 300.0f;
             //        break;
             //    }
@@ -188,16 +188,16 @@ void only_sfml() {
         }
 
         // Apply acceleration based on input
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Left)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Left)) {
             accelerations[player].ax = -300.0f;
         }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Right)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Right)) {
             accelerations[player].ax = 300.0f;
         }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Up)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Up)) {
             accelerations[player].ay = -300.0f;
         }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Down)) {
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scan::Down)) {
             accelerations[player].ay = 300.0f;
         }
 

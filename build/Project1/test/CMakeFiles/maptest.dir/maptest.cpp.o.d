@@ -1,5 +1,5 @@
 Project1/test/CMakeFiles/maptest.dir/maptest.cpp.o: \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/test/maptest.cpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/test/maptest.cpp \
   /opt/homebrew/include/SFML/Graphics.hpp \
   /opt/homebrew/include/SFML/Graphics/BlendMode.hpp \
   /opt/homebrew/include/SFML/Graphics/Export.hpp \
@@ -1111,8 +1111,8 @@ Project1/test/CMakeFiles/maptest.dir/maptest.cpp.o: \
   /opt/homebrew/include/SFML/System/InputStream.hpp \
   /opt/homebrew/include/SFML/System/MemoryInputStream.hpp \
   /opt/homebrew/include/SFML/System/Sleep.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Map/TileMap.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Map/TileMap.hpp \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/fstream \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Map/Tile.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Map/MapService.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Systems/TileRenderSystem.hpp
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Map/Tile.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Map/MapService.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Systems/TileRenderSystem.hpp

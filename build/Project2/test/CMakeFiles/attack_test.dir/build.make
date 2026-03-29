@@ -53,10 +53,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/pioneer/.openclaw/workspace/GameBasedOnSFML
+CMAKE_SOURCE_DIR = /Users/pioneer/.openclaw/workspace/SFMLGame
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build
+CMAKE_BINARY_DIR = /Users/pioneer/.openclaw/workspace/SFMLGame/build
 
 # Include any dependencies generated for this target.
 include Project2/test/CMakeFiles/attack_test.dir/depend.make
@@ -73,18 +73,18 @@ Project2/test/CMakeFiles/attack_test.dir/codegen:
 .PHONY : Project2/test/CMakeFiles/attack_test.dir/codegen
 
 Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o: Project2/test/CMakeFiles/attack_test.dir/flags.make
-Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o: /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/test/attack_test.cpp
+Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o: /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/test/attack_test.cpp
 Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o: Project2/test/CMakeFiles/attack_test.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o -MF CMakeFiles/attack_test.dir/attack_test.cpp.o.d -o CMakeFiles/attack_test.dir/attack_test.cpp.o -c /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/test/attack_test.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/pioneer/.openclaw/workspace/SFMLGame/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o"
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o -MF CMakeFiles/attack_test.dir/attack_test.cpp.o.d -o CMakeFiles/attack_test.dir/attack_test.cpp.o -c /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/test/attack_test.cpp
 
 Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/attack_test.dir/attack_test.cpp.i"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/test/attack_test.cpp > CMakeFiles/attack_test.dir/attack_test.cpp.i
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/test/attack_test.cpp > CMakeFiles/attack_test.dir/attack_test.cpp.i
 
 Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/attack_test.dir/attack_test.cpp.s"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/test/attack_test.cpp -o CMakeFiles/attack_test.dir/attack_test.cpp.s
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2/test && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/test/attack_test.cpp -o CMakeFiles/attack_test.dir/attack_test.cpp.s
 
 # Object files for target attack_test
 attack_test_OBJECTS = \
@@ -101,18 +101,18 @@ bin/attack_test: /opt/homebrew/lib/libsfml-audio.3.0.2.dylib
 bin/attack_test: /opt/homebrew/lib/libsfml-window.3.0.2.dylib
 bin/attack_test: /opt/homebrew/lib/libsfml-system.3.0.2.dylib
 bin/attack_test: Project2/test/CMakeFiles/attack_test.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable ../../bin/attack_test"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2/test && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/attack_test.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/pioneer/.openclaw/workspace/SFMLGame/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable ../../bin/attack_test"
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2/test && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/attack_test.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 Project2/test/CMakeFiles/attack_test.dir/build: bin/attack_test
 .PHONY : Project2/test/CMakeFiles/attack_test.dir/build
 
 Project2/test/CMakeFiles/attack_test.dir/clean:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2/test && $(CMAKE_COMMAND) -P CMakeFiles/attack_test.dir/cmake_clean.cmake
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2/test && $(CMAKE_COMMAND) -P CMakeFiles/attack_test.dir/cmake_clean.cmake
 .PHONY : Project2/test/CMakeFiles/attack_test.dir/clean
 
 Project2/test/CMakeFiles/attack_test.dir/depend:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /Users/pioneer/.openclaw/workspace/GameBasedOnSFML /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/test /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2/test /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2/test/CMakeFiles/attack_test.dir/DependInfo.cmake "--color=$(COLOR)" attack_test
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /Users/pioneer/.openclaw/workspace/SFMLGame /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/test /Users/pioneer/.openclaw/workspace/SFMLGame/build /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2/test /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2/test/CMakeFiles/attack_test.dir/DependInfo.cmake "--color=$(COLOR)" attack_test
 .PHONY : Project2/test/CMakeFiles/attack_test.dir/depend
 

@@ -7,11 +7,11 @@ set(CMAKE_DEPENDS_GENERATOR "Unix Makefiles")
 # The top level Makefile was generated from the following files:
 set(CMAKE_MAKEFILE_DEPENDS
   "CMakeCache.txt"
-  "/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/CMakeLists.txt"
-  "/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/CMakeLists.txt"
-  "/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/test/CMakeLists.txt"
-  "/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/CMakeLists.txt"
-  "/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/test/CMakeLists.txt"
+  "/Users/pioneer/.openclaw/workspace/SFMLGame/CMakeLists.txt"
+  "/Users/pioneer/.openclaw/workspace/SFMLGame/Project1/CMakeLists.txt"
+  "/Users/pioneer/.openclaw/workspace/SFMLGame/Project1/test/CMakeLists.txt"
+  "/Users/pioneer/.openclaw/workspace/SFMLGame/Project2/CMakeLists.txt"
+  "/Users/pioneer/.openclaw/workspace/SFMLGame/Project2/test/CMakeLists.txt"
   "CMakeFiles/4.3.0/CMakeCCompiler.cmake"
   "CMakeFiles/4.3.0/CMakeCXXCompiler.cmake"
   "CMakeFiles/4.3.0/CMakeSystem.cmake"

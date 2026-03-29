@@ -1,5 +1,5 @@
 Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o: \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/test/walktest.cpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/test/walktest.cpp \
   /opt/homebrew/include/SFML/Graphics.hpp \
   /opt/homebrew/include/SFML/Graphics/BlendMode.hpp \
   /opt/homebrew/include/SFML/Graphics/Export.hpp \
@@ -1111,20 +1111,20 @@ Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o: \
   /opt/homebrew/include/SFML/System/InputStream.hpp \
   /opt/homebrew/include/SFML/System/MemoryInputStream.hpp \
   /opt/homebrew/include/SFML/System/Sleep.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/EventBus.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/EventBus.hpp \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/typeindex \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/ComponentManager.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Components.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Entity.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/ComponentManager.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Components.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Entity.hpp \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/unordered_set \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/EntityManager.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Systems/InputSystem.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Systems/MovementSystem.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Systems/RenderSystem.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/EntityManager.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Systems/InputSystem.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Systems/MovementSystem.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Systems/RenderSystem.hpp \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/iostream \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Systems/CameraSystem.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Systems/SpawnerSystem.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/SpawnConfig.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Systems/CameraSystem.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Systems/SpawnerSystem.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/SpawnConfig.hpp \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/random \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/bernoulli_distribution.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/uniform_real_distribution.h \
@@ -1177,5 +1177,5 @@ Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o: \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/seed_seq.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/student_t_distribution.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__random/weibull_distribution.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Systems/ChaseSystem.hpp \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/include/Systems/CombatSystem.hpp
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Systems/ChaseSystem.hpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/include/Systems/CombatSystem.hpp

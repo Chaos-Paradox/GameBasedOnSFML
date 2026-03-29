@@ -1,5 +1,5 @@
 Project1/test/CMakeFiles/tmptest.dir/tmptest.cpp.o: \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/test/tmptest.cpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/test/tmptest.cpp \
   /opt/homebrew/include/SFML/Graphics.hpp \
   /opt/homebrew/include/SFML/Graphics/BlendMode.hpp \
   /opt/homebrew/include/SFML/Graphics/Export.hpp \

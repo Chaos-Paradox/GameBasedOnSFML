@@ -53,10 +53,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/pioneer/.openclaw/workspace/GameBasedOnSFML
+CMAKE_SOURCE_DIR = /Users/pioneer/.openclaw/workspace/SFMLGame
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build
+CMAKE_BINARY_DIR = /Users/pioneer/.openclaw/workspace/SFMLGame/build
 
 # Include any dependencies generated for this target.
 include Project2/CMakeFiles/Project2.dir/depend.make
@@ -73,18 +73,18 @@ Project2/CMakeFiles/Project2.dir/codegen:
 .PHONY : Project2/CMakeFiles/Project2.dir/codegen
 
 Project2/CMakeFiles/Project2.dir/src/tools.cpp.o: Project2/CMakeFiles/Project2.dir/flags.make
-Project2/CMakeFiles/Project2.dir/src/tools.cpp.o: /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/src/tools.cpp
+Project2/CMakeFiles/Project2.dir/src/tools.cpp.o: /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/src/tools.cpp
 Project2/CMakeFiles/Project2.dir/src/tools.cpp.o: Project2/CMakeFiles/Project2.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object Project2/CMakeFiles/Project2.dir/src/tools.cpp.o"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2 && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT Project2/CMakeFiles/Project2.dir/src/tools.cpp.o -MF CMakeFiles/Project2.dir/src/tools.cpp.o.d -o CMakeFiles/Project2.dir/src/tools.cpp.o -c /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/src/tools.cpp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/pioneer/.openclaw/workspace/SFMLGame/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object Project2/CMakeFiles/Project2.dir/src/tools.cpp.o"
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2 && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT Project2/CMakeFiles/Project2.dir/src/tools.cpp.o -MF CMakeFiles/Project2.dir/src/tools.cpp.o.d -o CMakeFiles/Project2.dir/src/tools.cpp.o -c /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/src/tools.cpp
 
 Project2/CMakeFiles/Project2.dir/src/tools.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/Project2.dir/src/tools.cpp.i"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2 && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/src/tools.cpp > CMakeFiles/Project2.dir/src/tools.cpp.i
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2 && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/src/tools.cpp > CMakeFiles/Project2.dir/src/tools.cpp.i
 
 Project2/CMakeFiles/Project2.dir/src/tools.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/Project2.dir/src/tools.cpp.s"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2 && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/src/tools.cpp -o CMakeFiles/Project2.dir/src/tools.cpp.s
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2 && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/src/tools.cpp -o CMakeFiles/Project2.dir/src/tools.cpp.s
 
 # Object files for target Project2
 Project2_OBJECTS = \
@@ -96,19 +96,19 @@ Project2_EXTERNAL_OBJECTS =
 lib/libProject2.a: Project2/CMakeFiles/Project2.dir/src/tools.cpp.o
 lib/libProject2.a: Project2/CMakeFiles/Project2.dir/build.make
 lib/libProject2.a: Project2/CMakeFiles/Project2.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX static library ../lib/libProject2.a"
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2 && $(CMAKE_COMMAND) -P CMakeFiles/Project2.dir/cmake_clean_target.cmake
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2 && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/Project2.dir/link.txt --verbose=$(VERBOSE)
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/pioneer/.openclaw/workspace/SFMLGame/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX static library ../lib/libProject2.a"
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2 && $(CMAKE_COMMAND) -P CMakeFiles/Project2.dir/cmake_clean_target.cmake
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2 && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/Project2.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
 Project2/CMakeFiles/Project2.dir/build: lib/libProject2.a
 .PHONY : Project2/CMakeFiles/Project2.dir/build
 
 Project2/CMakeFiles/Project2.dir/clean:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2 && $(CMAKE_COMMAND) -P CMakeFiles/Project2.dir/cmake_clean.cmake
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2 && $(CMAKE_COMMAND) -P CMakeFiles/Project2.dir/cmake_clean.cmake
 .PHONY : Project2/CMakeFiles/Project2.dir/clean
 
 Project2/CMakeFiles/Project2.dir/depend:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /Users/pioneer/.openclaw/workspace/GameBasedOnSFML /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2 /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2 /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project2/CMakeFiles/Project2.dir/DependInfo.cmake "--color=$(COLOR)" Project2
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /Users/pioneer/.openclaw/workspace/SFMLGame /Users/pioneer/.openclaw/workspace/SFMLGame/Project2 /Users/pioneer/.openclaw/workspace/SFMLGame/build /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2 /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project2/CMakeFiles/Project2.dir/DependInfo.cmake "--color=$(COLOR)" Project2
 .PHONY : Project2/CMakeFiles/Project2.dir/depend
 

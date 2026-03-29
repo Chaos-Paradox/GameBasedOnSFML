@@ -1,5 +1,5 @@
 Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o: \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/test/attack_test.cpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/test/attack_test.cpp \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/iostream \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__config \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__config_site \
@@ -978,25 +978,25 @@ Project2/test/CMakeFiles/attack_test.dir/attack_test.cpp.o: \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/stack \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/print \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/unistd.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/core/ECS.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/core/Entity.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/core/Component.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/components/Position.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/components/Stats.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/components/InputCommand.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/components/AttackState.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/systems/InputSystem.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/systems/../components/InputCommand.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/systems/MovementSystem.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/systems/../components/Position.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/systems/AttackSystem.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/systems/../components/AttackState.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/systems/../components/Stats.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/systems/CombatSystem.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/systems/../utils/Math.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/utils/Logging.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/utils/../core/ECS.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/utils/../components/InputCommand.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/utils/../components/Position.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/utils/../components/Stats.h \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project2/include/utils/../components/AttackState.h
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/core/ECS.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/core/Entity.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/core/Component.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/components/Position.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/components/Stats.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/components/InputCommand.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/components/AttackState.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/systems/InputSystem.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/systems/../components/InputCommand.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/systems/MovementSystem.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/systems/../components/Position.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/systems/AttackSystem.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/systems/../components/AttackState.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/systems/../components/Stats.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/systems/CombatSystem.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/systems/../utils/Math.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/utils/Logging.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/utils/../core/ECS.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/utils/../components/InputCommand.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/utils/../components/Position.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/utils/../components/Stats.h \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project2/include/utils/../components/AttackState.h

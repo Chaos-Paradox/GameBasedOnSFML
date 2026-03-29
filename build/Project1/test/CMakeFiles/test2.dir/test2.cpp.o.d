@@ -1,5 +1,5 @@
 Project1/test/CMakeFiles/test2.dir/test2.cpp.o: \
-  /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/Project1/test/test2.cpp \
+  /Users/pioneer/.openclaw/workspace/SFMLGame/Project1/test/test2.cpp \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/iostream \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__config \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1/__config_site \

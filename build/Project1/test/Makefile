@@ -57,10 +57,10 @@ RM = /opt/homebrew/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /Users/pioneer/.openclaw/workspace/GameBasedOnSFML
+CMAKE_SOURCE_DIR = /Users/pioneer/.openclaw/workspace/SFMLGame
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build
+CMAKE_BINARY_DIR = /Users/pioneer/.openclaw/workspace/SFMLGame/build
 
 #=============================================================================
 # Targets provided globally by CMake.
@@ -87,14 +87,14 @@ rebuild_cache/fast: rebuild_cache
 
 # The main all target
 all: cmake_check_build_system
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(CMAKE_COMMAND) -E cmake_progress_start /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/CMakeFiles /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/Project1/test//CMakeFiles/progress.marks
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build/CMakeFiles 0
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(CMAKE_COMMAND) -E cmake_progress_start /Users/pioneer/.openclaw/workspace/SFMLGame/build/CMakeFiles /Users/pioneer/.openclaw/workspace/SFMLGame/build/Project1/test//CMakeFiles/progress.marks
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/pioneer/.openclaw/workspace/SFMLGame/build/CMakeFiles 0
 .PHONY : all
 
 # The main clean target
 clean:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/clean
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/clean
 .PHONY : clean
 
 # The main clean target
@@ -103,22 +103,22 @@ clean/fast: clean
 
 # Prepare targets for installation.
 preinstall: all
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/preinstall
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/preinstall
 .PHONY : preinstall
 
 # Prepare targets for installation.
 preinstall/fast:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/preinstall
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/preinstall
 .PHONY : preinstall/fast
 
 # clear depends
 depend:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
 # Convenience name for target.
 Project1/test/CMakeFiles/test.dir/rule:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/CMakeFiles/test.dir/rule
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/CMakeFiles/test.dir/rule
 .PHONY : Project1/test/CMakeFiles/test.dir/rule
 
 # Convenience name for target.
@@ -127,12 +127,12 @@ test: Project1/test/CMakeFiles/test.dir/rule
 
 # fast build rule for target.
 test/fast:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test.dir/build.make Project1/test/CMakeFiles/test.dir/build
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test.dir/build.make Project1/test/CMakeFiles/test.dir/build
 .PHONY : test/fast
 
 # Convenience name for target.
 Project1/test/CMakeFiles/test2.dir/rule:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/CMakeFiles/test2.dir/rule
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/CMakeFiles/test2.dir/rule
 .PHONY : Project1/test/CMakeFiles/test2.dir/rule
 
 # Convenience name for target.
@@ -141,12 +141,12 @@ test2: Project1/test/CMakeFiles/test2.dir/rule
 
 # fast build rule for target.
 test2/fast:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test2.dir/build.make Project1/test/CMakeFiles/test2.dir/build
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test2.dir/build.make Project1/test/CMakeFiles/test2.dir/build
 .PHONY : test2/fast
 
 # Convenience name for target.
 Project1/test/CMakeFiles/walktest.dir/rule:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/CMakeFiles/walktest.dir/rule
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/CMakeFiles/walktest.dir/rule
 .PHONY : Project1/test/CMakeFiles/walktest.dir/rule
 
 # Convenience name for target.
@@ -155,12 +155,12 @@ walktest: Project1/test/CMakeFiles/walktest.dir/rule
 
 # fast build rule for target.
 walktest/fast:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/walktest.dir/build.make Project1/test/CMakeFiles/walktest.dir/build
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/walktest.dir/build.make Project1/test/CMakeFiles/walktest.dir/build
 .PHONY : walktest/fast
 
 # Convenience name for target.
 Project1/test/CMakeFiles/tmptest.dir/rule:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/CMakeFiles/tmptest.dir/rule
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/CMakeFiles/tmptest.dir/rule
 .PHONY : Project1/test/CMakeFiles/tmptest.dir/rule
 
 # Convenience name for target.
@@ -169,12 +169,12 @@ tmptest: Project1/test/CMakeFiles/tmptest.dir/rule
 
 # fast build rule for target.
 tmptest/fast:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/tmptest.dir/build.make Project1/test/CMakeFiles/tmptest.dir/build
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/tmptest.dir/build.make Project1/test/CMakeFiles/tmptest.dir/build
 .PHONY : tmptest/fast
 
 # Convenience name for target.
 Project1/test/CMakeFiles/maptest.dir/rule:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/CMakeFiles/maptest.dir/rule
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 Project1/test/CMakeFiles/maptest.dir/rule
 .PHONY : Project1/test/CMakeFiles/maptest.dir/rule
 
 # Convenience name for target.
@@ -183,7 +183,7 @@ maptest: Project1/test/CMakeFiles/maptest.dir/rule
 
 # fast build rule for target.
 maptest/fast:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/maptest.dir/build.make Project1/test/CMakeFiles/maptest.dir/build
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/maptest.dir/build.make Project1/test/CMakeFiles/maptest.dir/build
 .PHONY : maptest/fast
 
 maptest.o: maptest.cpp.o
@@ -191,7 +191,7 @@ maptest.o: maptest.cpp.o
 
 # target to build an object file
 maptest.cpp.o:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/maptest.dir/build.make Project1/test/CMakeFiles/maptest.dir/maptest.cpp.o
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/maptest.dir/build.make Project1/test/CMakeFiles/maptest.dir/maptest.cpp.o
 .PHONY : maptest.cpp.o
 
 maptest.i: maptest.cpp.i
@@ -199,7 +199,7 @@ maptest.i: maptest.cpp.i
 
 # target to preprocess a source file
 maptest.cpp.i:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/maptest.dir/build.make Project1/test/CMakeFiles/maptest.dir/maptest.cpp.i
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/maptest.dir/build.make Project1/test/CMakeFiles/maptest.dir/maptest.cpp.i
 .PHONY : maptest.cpp.i
 
 maptest.s: maptest.cpp.s
@@ -207,7 +207,7 @@ maptest.s: maptest.cpp.s
 
 # target to generate assembly for a file
 maptest.cpp.s:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/maptest.dir/build.make Project1/test/CMakeFiles/maptest.dir/maptest.cpp.s
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/maptest.dir/build.make Project1/test/CMakeFiles/maptest.dir/maptest.cpp.s
 .PHONY : maptest.cpp.s
 
 test.o: test.cpp.o
@@ -215,7 +215,7 @@ test.o: test.cpp.o
 
 # target to build an object file
 test.cpp.o:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test.dir/build.make Project1/test/CMakeFiles/test.dir/test.cpp.o
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test.dir/build.make Project1/test/CMakeFiles/test.dir/test.cpp.o
 .PHONY : test.cpp.o
 
 test.i: test.cpp.i
@@ -223,7 +223,7 @@ test.i: test.cpp.i
 
 # target to preprocess a source file
 test.cpp.i:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test.dir/build.make Project1/test/CMakeFiles/test.dir/test.cpp.i
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test.dir/build.make Project1/test/CMakeFiles/test.dir/test.cpp.i
 .PHONY : test.cpp.i
 
 test.s: test.cpp.s
@@ -231,7 +231,7 @@ test.s: test.cpp.s
 
 # target to generate assembly for a file
 test.cpp.s:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test.dir/build.make Project1/test/CMakeFiles/test.dir/test.cpp.s
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test.dir/build.make Project1/test/CMakeFiles/test.dir/test.cpp.s
 .PHONY : test.cpp.s
 
 test2.o: test2.cpp.o
@@ -239,7 +239,7 @@ test2.o: test2.cpp.o
 
 # target to build an object file
 test2.cpp.o:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test2.dir/build.make Project1/test/CMakeFiles/test2.dir/test2.cpp.o
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test2.dir/build.make Project1/test/CMakeFiles/test2.dir/test2.cpp.o
 .PHONY : test2.cpp.o
 
 test2.i: test2.cpp.i
@@ -247,7 +247,7 @@ test2.i: test2.cpp.i
 
 # target to preprocess a source file
 test2.cpp.i:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test2.dir/build.make Project1/test/CMakeFiles/test2.dir/test2.cpp.i
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test2.dir/build.make Project1/test/CMakeFiles/test2.dir/test2.cpp.i
 .PHONY : test2.cpp.i
 
 test2.s: test2.cpp.s
@@ -255,7 +255,7 @@ test2.s: test2.cpp.s
 
 # target to generate assembly for a file
 test2.cpp.s:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test2.dir/build.make Project1/test/CMakeFiles/test2.dir/test2.cpp.s
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/test2.dir/build.make Project1/test/CMakeFiles/test2.dir/test2.cpp.s
 .PHONY : test2.cpp.s
 
 tmptest.o: tmptest.cpp.o
@@ -263,7 +263,7 @@ tmptest.o: tmptest.cpp.o
 
 # target to build an object file
 tmptest.cpp.o:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/tmptest.dir/build.make Project1/test/CMakeFiles/tmptest.dir/tmptest.cpp.o
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/tmptest.dir/build.make Project1/test/CMakeFiles/tmptest.dir/tmptest.cpp.o
 .PHONY : tmptest.cpp.o
 
 tmptest.i: tmptest.cpp.i
@@ -271,7 +271,7 @@ tmptest.i: tmptest.cpp.i
 
 # target to preprocess a source file
 tmptest.cpp.i:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/tmptest.dir/build.make Project1/test/CMakeFiles/tmptest.dir/tmptest.cpp.i
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/tmptest.dir/build.make Project1/test/CMakeFiles/tmptest.dir/tmptest.cpp.i
 .PHONY : tmptest.cpp.i
 
 tmptest.s: tmptest.cpp.s
@@ -279,7 +279,7 @@ tmptest.s: tmptest.cpp.s
 
 # target to generate assembly for a file
 tmptest.cpp.s:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/tmptest.dir/build.make Project1/test/CMakeFiles/tmptest.dir/tmptest.cpp.s
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/tmptest.dir/build.make Project1/test/CMakeFiles/tmptest.dir/tmptest.cpp.s
 .PHONY : tmptest.cpp.s
 
 walktest.o: walktest.cpp.o
@@ -287,7 +287,7 @@ walktest.o: walktest.cpp.o
 
 # target to build an object file
 walktest.cpp.o:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/walktest.dir/build.make Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/walktest.dir/build.make Project1/test/CMakeFiles/walktest.dir/walktest.cpp.o
 .PHONY : walktest.cpp.o
 
 walktest.i: walktest.cpp.i
@@ -295,7 +295,7 @@ walktest.i: walktest.cpp.i
 
 # target to preprocess a source file
 walktest.cpp.i:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/walktest.dir/build.make Project1/test/CMakeFiles/walktest.dir/walktest.cpp.i
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/walktest.dir/build.make Project1/test/CMakeFiles/walktest.dir/walktest.cpp.i
 .PHONY : walktest.cpp.i
 
 walktest.s: walktest.cpp.s
@@ -303,7 +303,7 @@ walktest.s: walktest.cpp.s
 
 # target to generate assembly for a file
 walktest.cpp.s:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/walktest.dir/build.make Project1/test/CMakeFiles/walktest.dir/walktest.cpp.s
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(MAKE) $(MAKESILENT) -f Project1/test/CMakeFiles/walktest.dir/build.make Project1/test/CMakeFiles/walktest.dir/walktest.cpp.s
 .PHONY : walktest.cpp.s
 
 # Help Target
@@ -345,6 +345,6 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
-	cd /Users/pioneer/.openclaw/workspace/GameBasedOnSFML/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
+	cd /Users/pioneer/.openclaw/workspace/SFMLGame/build && $(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 
