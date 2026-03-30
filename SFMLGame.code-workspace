@@ -1,0 +1,15 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"terminal.integrated.cwd": "${workspaceFolder}",
+		"editor.formatOnSave": true,
+		"files.associations": {
+			"*.h": "cpp",
+			"*.hpp": "cpp"
+		}
+	}
+}

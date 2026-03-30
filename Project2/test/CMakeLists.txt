@@ -1,30 +1,8 @@
+# Project2 GTest 测试程序
 project(test)
 
-# 跨平台 SFML 配置
-if(APPLE)
-    # macOS
-    find_package(SFML 3 COMPONENTS Graphics Audio Window System REQUIRED)
-    set(SFML_LIBS SFML::Graphics SFML::Audio SFML::Window SFML::System)
-    
-elseif(WIN32)
-    # Windows
-    set(SFML_LIBS 
-        sfml-graphics-s
-        sfml-window-s
-        sfml-system-s
-        sfml-audio-s
-        opengl32
-        freetype
-        winmm
-        gdi32
-    )
-    
-elseif(UNIX)
-    # Linux
-    find_package(SFML 3 COMPONENTS Graphics Audio Window System REQUIRED)
-    set(SFML_LIBS SFML::Graphics SFML::Audio SFML::Window SFML::System)
-endif()
+find_package(GTest REQUIRED)
 
-# 测试程序
-add_executable("attack_test" "attack_test.cpp")
-target_link_libraries("attack_test" Project2 ${SFML_LIBS})
+# 战利品管线测试（GTest）
+add_executable("loot_pipeline_test" "loot_pipeline_test.cpp")
+target_link_libraries("loot_pipeline_test" Project2 GTest::gtest_main)

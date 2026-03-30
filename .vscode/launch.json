@@ -1,0 +1,35 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug - walktest",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/walktest",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "stopOnEntry": false
+        },
+        {
+            "name": "Debug - collision_test",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/collision_test",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "stopOnEntry": false
+        },
+        {
+            "name": "Debug - attack_test",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/attack_test",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "externalConsole": false,
+            "stopOnEntry": false
+        }
+    ]
+}

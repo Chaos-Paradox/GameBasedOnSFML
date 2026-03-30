@@ -2,6 +2,17 @@
 
 基于 SFML 库的游戏项目，支持跨平台开发。
 
+## 项目结构
+
+本项目采用多 Project 架构，每个 Project 独立管理：
+
+| Project | 说明 | 文档 |
+|---------|------|------|
+| **Project1** | ECS 框架（通用基础） | [Project1/docs/](Project1/docs/) |
+| **Project2** | 游戏逻辑（状态机、战斗） | [Project2/docs/](Project2/docs/) |
+| **ThirdParty** | 第三方库（SFML Windows） | - |
+| **material** | 游戏素材 | - |
+
 ## 跨平台支持
 
 - ✅ macOS (Homebrew SFML)
@@ -54,25 +65,25 @@ cmake ..
 make
 ```
 
-## 项目结构
+## 📚 文档导航
 
-```
-SFMLGame/
-├── CMakeLists.txt          # 主 CMake 配置（跨平台）
-├── Project1/               # 项目 1（ECS 框架）
-│   ├── CMakeLists.txt
-│   ├── src/
-│   ├── include/
-│   └── test/
-├── Project2/               # 项目 2
-│   ├── CMakeLists.txt
-│   ├── src/
-│   └── test/
-├── ThirdParty/             # 第三方库（Windows SFML）
-└── material/               # 游戏素材
-    ├── fonts/
-    └── pictures/
-```
+### Project1 - ECS 框架
+
+- [架构总览](Project1/docs/00_ARCHITECTURE.md) - ECS 核心设计
+- [数据字典](Project1/docs/01_DATA_SCHEMA.md) - 组件数据结构
+- [功能模块](Project1/docs/features/) - 系统文档索引
+
+### Project2 - 游戏逻辑
+
+- [架构总览](Project2/docs/00_ARCHITECTURE.md) - 游戏架构和状态机
+- [数据字典](Project2/docs/01_DATA_SCHEMA.md) - 状态和组件定义
+- [功能模块](Project2/docs/features/) - 功能文档索引
+- [开发状态](Project2/STATUS.md) - 当前进度
+
+### 通用文档
+
+- [部署指南](DEPLOY.md) - 编译和打包
+- [许可证](LICENSE) - MIT License
 
 ## 测试程序
 
