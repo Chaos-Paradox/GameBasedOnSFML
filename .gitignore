@@ -1,1 +1,58 @@
+# ==================== 编译产物 ====================
+# 根目录 build
 build/
+bin/
+lib/
+obj/
+
+# 所有子项目内部的 build 文件夹
+**/build/
+**/bin/
+**/lib/
+**/obj/
+
+# CMake 生成文件
+**/CMakeCache.txt
+**/CMakeFiles/
+**/cmake_install.cmake
+**/Makefile
+**/*.o
+**/*.a
+**/*.so
+**/*.dylib
+
+# ==================== IDE 配置 ====================
+# VSCode
+.vscode/
+**/.vscode/
+
+# CLion/IntelliJ
+.idea/
+**/.idea/
+*.iml
+
+# Vim/Emacs
+*.swp
+*.swo
+*~
+.*.swp
+
+# ==================== 操作系统 ====================
+# macOS
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ==================== 其他 ====================
+# 日志
+*.log
+
+# 临时文件
+*.tmp
+*.temp
