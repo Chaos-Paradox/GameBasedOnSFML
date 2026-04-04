@@ -11,10 +11,10 @@
 #include "components/DamageTag.h"
 #include "components/DeathTag.h"
 #include "systems/DamageSystem.h"
-#include "systems/DamageSystem.h"
 #include "systems/LootSpawnSystem.h"
 #include "systems/DeathSystem.h"
 #include "systems/PickupSystem.h"
+#include "components/MagnetComponent.h"
 
 /**
  * @brief 战利品管线测试
@@ -41,9 +41,11 @@ protected:
     ComponentStore<ItemDataComponent> itemDatas;
     ComponentStore<PickupBoxComponent> pickupBoxes;
     ComponentStore<EvolutionComponent> evolutions;
-    ComponentStore<DamageTag> damageTags;
+    ComponentStore<InputCommand> inputs;
+    ComponentStore<DamageEventComponent> damageEvents;  // ← 改为事件实体
     ComponentStore<DeathTag> deathTags;
     ComponentStore<StateMachineComponent> states;
+    ComponentStore<MagnetComponent> magnets;
     
     DamageSystem damageSystem;
     LootSpawnSystem lootSpawnSystem;
@@ -59,7 +61,7 @@ protected:
         itemDatas = ComponentStore<ItemDataComponent>();
         pickupBoxes = ComponentStore<PickupBoxComponent>();
         evolutions = ComponentStore<EvolutionComponent>();
-        damageTags = ComponentStore<DamageTag>();
+        damageEvents = ComponentStore<DamageEventComponent>();  // ← 改为事件实体
         deathTags = ComponentStore<DeathTag>();
     }
 };
@@ -130,7 +132,7 @@ TEST_F(LootPipelineTest, PlayerPickup_GainsEvolutionPoints) {
     pickupBoxes.add(loot, {30.0f, 30.0f});
     
     // 3. 运行 PickupSystem
-    pickupSystem.update(evolutions, transforms, transforms, itemDatas, pickupBoxes);
+    pickupSystem.update(ecs, evolutions, transforms, transforms, itemDatas, pickupBoxes, magnets);
     
     // 4. 断言：玩家获得 5 点进化点数
     const auto& evolution = evolutions.get(player);
@@ -166,16 +168,26 @@ TEST_F(LootPipelineTest, FullPipeline_KillDropPickup) {
     
     // 3. 对怪物造成伤害（HP ≤ 0）
     characters.get(monster).currentHP = 0;
-    deathTags.add(monster, {0.0f});
+    
+    // ← 【核心改动】创建伤害事件实体（模拟 CollisionSystem）
+    Entity damageEvent = ecs.create();
+    damageEvents.add(damageEvent, {
+        .target = monster,
+        .actualDamage = 100,  // 足够击杀怪物
+        .hitPosition = {400.0f, 300.0f},
+        .isCritical = false,
+        .attacker = player,
+        .timestamp = 0.0f
+    });
     
     // 4. 运行 DamageSystem
-    damageSystem.update(characters, damageTags, deathTags);
+    damageSystem.update(characters, damageEvents, deathTags);
     
     // 5. 运行 LootSpawnSystem
     lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
     
-    // 6. 运行 DeathSystem（销毁怪物）
-    deathSystem.update(states, deathTags, 0.016f);
+    // 6. 运行 DeathSystem（彻底清理组件）
+    deathSystem.update(states, transforms, characters, hurtboxes, lootDrops, inputs, deathTags, ecs, 0.016f);
     
     // 7. 验证怪物状态切换为 Dead（不销毁实体，由 CleanupSystem 处理）
     if (states.has(monster)) {
@@ -193,7 +205,7 @@ TEST_F(LootPipelineTest, FullPipeline_KillDropPickup) {
     transforms.get(player).position = transforms.get(loot).position;
     
     // 10. 运行 PickupSystem
-    pickupSystem.update(evolutions, transforms, transforms, itemDatas, pickupBoxes);
+    pickupSystem.update(ecs, evolutions, transforms, transforms, itemDatas, pickupBoxes, magnets);
     
     // 11. 验证玩家获得进化点数（3-5 点）
     const auto& evolution = evolutions.get(player);

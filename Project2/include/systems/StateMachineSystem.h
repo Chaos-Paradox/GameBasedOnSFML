@@ -3,20 +3,20 @@
 #include "../core/ECS.h"
 #include "../components/StateMachine.h"
 #include "../components/InputCommand.h"
-#include "../components/DamageTag.h"
+#include "../components/DamageEventComponent.h"  // ← 改为事件组件
 #include "../components/AttackState.h"
 
 /**
  * @brief 状态机系统
  * 
  * 职责：
- * - 读取 InputCommand 和 DamageTag
+ * - 读取 InputCommand 和 DamageEventComponent
  * - 切换 StateMachineComponent.currentState
  * - 受伤时强制切换为 Hurt 状态
  * - 进入/离开 Attack 状态时添加/移除 AttackStateComponent
  * 
  * ⚠️ Bug 1 修复：使用 AttackStateComponent 做单次触发锁
- * ⚠️ Bug 2 修复：StateMachineSystem 对 DamageTag 只读，不销毁
+ * ⚠️ 架构升级：通过 DamageEventComponent 检测受伤
  */
 class StateMachineSystem {
 public:
@@ -24,7 +24,7 @@ public:
         ComponentStore<StateMachineComponent>& states,
         ComponentStore<AttackStateComponent>& attackStates,
         const ComponentStore<InputCommand>& inputs,
-        const ComponentStore<DamageTag>& damageTags,
+        const ComponentStore<DamageEventComponent>& damageEvents,  // ← 改为事件组件
         ECS& ecs,
         float dt)
     {
@@ -34,8 +34,19 @@ public:
         for (Entity entity : entities) {
             auto& state = states.get(entity);
             
-            // 优先检查 DamageTag（受击）
-            if (damageTags.has(entity)) {
+            // ← 【核心改动】检查是否受到攻击（遍历事件实体）
+            bool isHit = false;
+            auto eventEntities = damageEvents.entityList();
+            for (Entity eventEntity : eventEntities) {
+                const auto& event = damageEvents.get(eventEntity);
+                if (event.target == entity) {
+                    isHit = true;
+                    break;
+                }
+            }
+            
+            // 优先检查受伤事件
+            if (isHit) {
                 // ← Bug 1 修复：离开 Attack 状态时移除 AttackStateComponent
                 if (state.currentState == CharacterState::Attack) {
                     ecs.removeComponent<AttackStateComponent>(entity, attackStates);

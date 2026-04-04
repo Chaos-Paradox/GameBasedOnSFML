@@ -33,6 +33,8 @@
 #include "components/ItemData.h"
 #include "components/PickupBox.h"
 #include "components/Evolution.h"
+#include "components/MagnetComponent.h"
+#include "components/DamageTextComponent.h"  // ← 新增：伤害飘字
 #include "systems/StateMachineSystem.h"
 #include "systems/LocomotionSystem.h"
 #include "systems/MovementSystem.h"
@@ -42,7 +44,11 @@
 #include "systems/DeathSystem.h"
 #include "systems/LootSpawnSystem.h"
 #include "systems/PickupSystem.h"
+#include "systems/MagnetSystem.h"
 #include "systems/CleanupSystem.h"
+#include "systems/DebugSystem.h"
+#include "systems/DamageTextSpawnerSystem.h"  // ← 新增：飘字生成
+#include "systems/DamageTextRenderSystem.h"    // ← 新增：飘字渲染
 
 constexpr int WINDOW_WIDTH = 1024;
 constexpr int WINDOW_HEIGHT = 768;
@@ -80,6 +86,7 @@ Vec2 getInputFromKeyboard() {
 auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, ComponentStore<TransformComponent>& transforms,
                   ComponentStore<CharacterComponent>& characters, ComponentStore<InputCommand>& inputs,
                   ComponentStore<HurtboxComponent>& hurtboxes, ComponentStore<EvolutionComponent>& evolutions,
+                  ComponentStore<MagnetComponent>& magnets,
                   float x, float y) {
     auto player = ecs.create();
     states.add(player, {CharacterState::Idle, CharacterState::Idle, 0.0f});
@@ -88,6 +95,13 @@ auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compo
     inputs.add(player, {{0.0f, 0.0f}, false});
     hurtboxes.add(player, {{-20, -20, 40, 40}, Faction::Player, 1, 0.0f});
     evolutions.add(player, {0, 0});
+    
+    // ← 新增：玩家的磁吸组件（可通过装备修改）
+    magnets.add(player, {
+        .magnetRadius = 200.0f,  // 吸收半径 200 像素（爽游体验：远距离吸附）
+        .magnetSpeed = 400.0f    // 吸收速度 400 像素/秒
+    });
+    
     return player;
 }
 
@@ -102,7 +116,7 @@ auto createDummy(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compon
     
     // ← 修复：添加掉落表：100% 掉落 1 个进化点（itemId=1）
     LootDropComponent dummyLoot;
-    dummyLoot.lootTable[0] = {1, 1.0f, 1, 1};
+    dummyLoot.lootTable[0] = {1, 1.0f, 1, 1, 0.0f, 400.0f};  // itemId, dropChance, minCount, maxCount, magnetRadius(0=关闭), magnetSpeed
     dummyLoot.lootCount = 1;
     dummyLoot.hasDropped = false;
     lootDrops.add(dummy, dummyLoot);
@@ -194,10 +208,19 @@ void renderGrid(sf::RenderWindow& window) {
 int main() {
     std::cout << "=== Project2 Loot Pipeline Sandbox ===\n";
     std::cout << "Controls: WASD to move, J to attack, Kill dummy to get evolution points!\n";
-    std::cout << "Visual: Red bar = HP, Green circle = Loot\n\n";
+    std::cout << "Debug: G = Show entity list, L = Show loot list\n";
+    std::cout << "Visual: Red bar = HP, Green circle = Loot, Floating text = Damage\n\n";
     
     sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Project2 Loot & Pickup Pipeline");
     window.setFramerateLimit(60);
+    
+    // ← 新增：加载字体（用于伤害飘字）
+    sf::Font font;
+    if (!font.openFromFile("/System/Library/Fonts/Supplemental/Arial.ttf")) {
+        std::cerr << "[Error] Failed to load font!\n";
+        return 1;
+    }
+    std::cout << "[Main] Font loaded successfully\n";
     
     // ECS 初始化
     ECS ecs;
@@ -209,13 +232,15 @@ int main() {
     ComponentStore<AttackStateComponent> attackStates;
     ComponentStore<HitboxComponent> hitboxes;
     ComponentStore<LifetimeComponent> lifetimes;
-    ComponentStore<DamageTag> damageTags;
+    ComponentStore<DamageEventComponent> damageEvents;  // ← 新增：伤害事件实体
+    ComponentStore<DamageTextComponent> damageTexts;    // ← 新增：伤害飘字
     ComponentStore<DeathTag> deathTags;
     
     // ← 战利品系统组件
     ComponentStore<LootDropComponent> lootDrops;
     ComponentStore<ItemDataComponent> itemDatas;
     ComponentStore<PickupBoxComponent> pickupBoxes;
+    ComponentStore<MagnetComponent> magnets;  // ← 新增：磁力组件
     ComponentStore<EvolutionComponent> evolutions;
     
     // System 初始化
@@ -228,10 +253,14 @@ int main() {
     DeathSystem deathSystem;
     LootSpawnSystem lootSpawnSystem;
     PickupSystem pickupSystem;
+    MagnetSystem magnetSystem;  // ← 新增：磁力系统
     CleanupSystem cleanupSystem;
+    DebugSystem debugSystem;    // ← 新增：调试系统
+    DamageTextSpawnerSystem damageTextSpawner;  // ← 新增：飘字生成
+    DamageTextRenderSystem damageTextRender;    // ← 新增：飘字渲染
     
-    // 创建玩家
-    auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, 200, 300);
+    // 创建玩家（带磁吸组件）
+    auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, magnets, 200, 300);
     
     // 创建假人（带掉落表）
     auto dummy = createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, 700, 300);
@@ -250,6 +279,28 @@ int main() {
             if (event->is<sf::Event::Closed>()) window.close();
             if (const auto* kp = event->getIf<sf::Event::KeyPressed>()) {
                 if (kp->code == sf::Keyboard::Key::Escape) window.close();
+                
+                // ← 新增：调试按键
+                if (kp->code == sf::Keyboard::Key::G) {
+                    debugSystem.printEntityList(ecs, transforms, characters, states, itemDatas, evolutions);
+                }
+                if (kp->code == sf::Keyboard::Key::L) {
+                    debugSystem.printLootList(transforms, itemDatas);
+                }
+            }
+            
+            // ← 新增：鼠标右键点击生成假人
+            if (const auto* mb = event->getIf<sf::Event::MouseButtonReleased>()) {
+                if (mb->button == sf::Mouse::Button::Right) {
+                    // 获取鼠标位置（屏幕坐标 → 游戏世界坐标）
+                    sf::Vector2i mousePos = sf::Mouse::getPosition(window);
+                    float worldX = static_cast<float>(mousePos.x);
+                    float worldY = static_cast<float>(mousePos.y);
+                    
+                    // 在鼠标位置生成假人
+                    auto newDummy = createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, worldX, worldY);
+                    std::cout << "Dummy created at (" << worldX << ", " << worldY << ")\n";
+                }
             }
         }
         
@@ -261,32 +312,67 @@ int main() {
         lastJPressed = currentJPressed;
         
         // ========== 战斗管线 ==========
-        stateSystem.update(states, attackStates, inputs, damageTags, ecs, dt);
-        damageSystem.update(characters, damageTags, deathTags);
+        stateSystem.update(states, attackStates, inputs, damageEvents, ecs, dt);
+        
+        // ← 【核心改动】CollisionSystem：创建伤害事件实体
+        collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, damageEvents, ecs, dt);
+        
+        // ← 【核心改动】DamageSystem：读取事件实体并结算
+        damageSystem.update(characters, damageEvents, deathTags);
         
         // 4. LootSpawnSystem ⭐【新增】(抢在尸体被清空前，生成掉落物)
         lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
         
-        // 5. DeathSystem ← 修复：传入 ecs 对象
-        deathSystem.update(states, deathTags, ecs, dt);
+        // 5. DeathSystem ← 【关键修复】传入所有组件存储，彻底清理
+        deathSystem.update(states, transforms, characters, hurtboxes, lootDrops, inputs, deathTags, ecs, dt);
         
         locomotionSystem.update(states, transforms, characters, inputs, dt);
+        
+        // ← 【关键设计】MagnetSystem：玩家拥有吸收半径
+        // 时序：必须在 MovementSystem 之前执行
+        magnetSystem.update(transforms, magnets, transforms, itemDatas, dt);
+        
+        // 统一运动系统（执行所有 velocity 的位移）
         movementSystem.update(transforms, dt);
+        
         attackSystem.update(states, attackStates, transforms, characters, ecs, transforms, hitboxes, lifetimes, dt);
-        collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, damageTags, dt);
         
-        // 10. PickupSystem ⭐【新增】(拾取判定：吃掉落物，加点数，销毁掉落物)
-        pickupSystem.update(evolutions, transforms, transforms, itemDatas, pickupBoxes);
+        // ← 【核心改动】CollisionSystem：创建伤害事件实体
+        collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, damageEvents, ecs, dt);
         
-        cleanupSystem.update(lifetimes, transforms, hitboxes, dt);
+        // ← 【核心改动】DamageSystem：读取事件实体并结算（攻击命中后）
+        damageSystem.update(characters, damageEvents, deathTags);
         
+        // 10. PickupSystem ⭐【修复】(拾取判定：吃掉落物，加点数，销毁掉落物)
+        // ← 【关键】ecs 必须作为第一个参数，并传入 magnets 用于清理
+        pickupSystem.update(ecs, evolutions, transforms, transforms, itemDatas, pickupBoxes, magnets);
+        
+        // ← 【新增】伤害飘字生成（在 Cleanup 之前，确保事件还在）
+        damageTextSpawner.update(damageEvents, damageTexts, ecs);
+        
+        // 11. CleanupSystem ⭐【清理】(销毁到期实体和事件)
+        cleanupSystem.update(lifetimes, transforms, hitboxes, magnets, itemDatas, pickupBoxes, damageEvents, ecs, dt);
+        
+        // ← 【关键修复 3】纯 ECS 渲染：直接遍历 characters.entityList()
         // 渲染
         window.clear(COLOR_BACKGROUND);
         renderGrid(window);
-        renderEntity(window, transforms.get(player), characters.get(player), states.get(player), true);
-        renderEntity(window, transforms.get(dummy), characters.get(dummy), states.get(dummy), false);
+        
+        // 渲染所有实体（玩家=绿色，假人=红色）
+        auto entityList = characters.entityList();
+        for (Entity entity : entityList) {
+            if (!transforms.has(entity) || !states.has(entity)) continue;
+            
+            bool isPlayer = (entity == player);
+            renderEntity(window, transforms.get(entity), characters.get(entity), states.get(entity), isPlayer);
+        }
+        
         renderHitboxes(window, transforms, hitboxes);
-        renderLoot(window, transforms, itemDatas);  // ← 修复 3：渲染掉落物
+        renderLoot(window, transforms, itemDatas);  // ← 渲染掉落物
+        
+        // ← 【新增】渲染伤害飘字
+        damageTextRender.update(damageTexts, window, font, ecs, dt);
+        
         window.display();
         
         // 调试输出（低频）

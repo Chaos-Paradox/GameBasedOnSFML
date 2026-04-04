@@ -8,6 +8,10 @@ struct LootEntry {
     float dropChance{0.0f};  // 掉落概率（0-1）
     int minCount{1};
     int maxCount{1};
+    
+    // ← 新增：磁吸参数
+    float magnetRadius{0.0f};  // 磁吸半径（0=关闭）
+    float magnetSpeed{400.0f}; // 磁吸速度
 };
 
 /**

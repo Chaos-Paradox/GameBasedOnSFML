@@ -5,12 +5,13 @@
  * 
  * 掉落物或可交互物品的数据
  * 
- * ⚠️ 修复：简化字段，移除冗余
- * 
  * @see PickupSystem - 拾取判定系统
  */
 struct ItemDataComponent {
-    unsigned int itemId{0};  // 物品 ID
-    int amount{1};           // 数量
-    bool isPickupable{true}; // 是否可拾取
+    unsigned int itemId{0};
+    int amount{1};
+    bool isPickupable{true};
+    
+    // ← 新增：磁吸免疫计时器（爆米花效果）
+    float magnetImmunityTimer{0.25f};  // 0.25 秒内不被磁吸（更短的抛射时间）
 };

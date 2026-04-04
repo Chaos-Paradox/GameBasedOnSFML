@@ -1,31 +1,29 @@
 #pragma once
 #include "../core/Component.h"
+#include "../core/ECS.h"
 #include "../components/Hitbox.h"
 #include "../components/Hurtbox.h"
 #include "../components/Transform.h"
-#include "../components/DamageTag.h"
+#include "../components/DamageEventComponent.h"
 #include "../math/Rect.h"
+#include <cstdlib>
 #include <iostream>
 
 /**
- * @brief 碰撞检测系统
+ * @brief 碰撞检测系统（掷骰子裁判）
  * 
  * 职责：
  * - 遍历所有 Hitbox 和 Hurtbox
  * - AABB 碰撞检测
  * - 自伤检测（不能伤害自己）
  * - 命中历史检测（防止重复伤害）
- * - 挂载 DamageTag 到目标
+ * - 计算伤害浮动（0.8f ~ 1.2f）
+ * - 创建 DamageEventComponent 事件实体
  * 
- * ⚠️ Bug 2 修复：正确应用 Hitbox 的 bounds 到世界坐标
+ * ⚠️ 关键设计：不再直接挂载 DamageTag，而是创建事件实体
  * 
- * TODO:
- * - [ ] 添加空间分区优化（四叉树）
- * - [ ] 添加阵营/友军检测
- * - [ ] 添加击退方向计算
- * - [ ] 添加碰撞音效
- * - [ ] 添加命中特效
- * - [ ] 添加命中停顿（Hitstop）
+ * @see DamageEventComponent - 伤害事件载荷
+ * @see DamageSystem - 伤害结算系统
  */
 class CollisionSystem {
 public:
@@ -34,7 +32,8 @@ public:
         const ComponentStore<HurtboxComponent>& hurtboxes,
         const ComponentStore<TransformComponent>& hitboxTransforms,
         const ComponentStore<TransformComponent>& targetTransforms,
-        ComponentStore<DamageTag>& damageTags,
+        ComponentStore<DamageEventComponent>& damageEvents,  // ← 改为事件实体存储
+        ECS& ecs,  // ← 新增：用于创建事件实体
         float dt)
     {
         (void)dt;
@@ -53,30 +52,18 @@ public:
             
             const auto& hitboxTransform = hitboxTransforms.get(hitboxEntity);
             
-            // ← Bug 2 修复：正确计算 Hitbox 的世界坐标
-            // hitbox.bounds 是相对于 hitboxTransform.position 的偏移
-            // 所以世界坐标 = transform.position + bounds 偏移
+            // 计算 Hitbox 的世界坐标
             Rect hitboxWorld = {
-                hitboxTransform.position.x + hitbox.bounds.x,  // 左边界
-                hitboxTransform.position.y + hitbox.bounds.y,  // 上边界
-                hitbox.bounds.width,                            // 宽度
-                hitbox.bounds.height                            // 高度
+                hitboxTransform.position.x + hitbox.bounds.x,
+                hitboxTransform.position.y + hitbox.bounds.y,
+                hitbox.bounds.width,
+                hitbox.bounds.height
             };
             
-            // ← 调试输出已禁用（高频日志）
-            // float hitboxCenterX = hitboxWorld.x + hitboxWorld.width / 2.0f;
-            // float hitboxCenterY = hitboxWorld.y + hitboxWorld.height / 2.0f;
-            // std::cout << "[Collision] Hitbox center=(" << hitboxCenterX << ", " << hitboxCenterY 
-            //           << ") size=" << hitboxWorld.width << "x" << hitboxWorld.height << "\n";
-            
             for (Entity hurtboxEntity : hurtboxEntities) {
-                // ← Bug 2 修复：不能伤害自己
+                // 不能伤害自己
                 if (hitboxEntity == hurtboxEntity) continue;
-                
-                // ← Bug 2 修复：检查 Hitbox 来源是否等于 Hurtbox 实体
-                if (hitbox.sourceEntity == hurtboxEntity) {
-                    continue;  // 不能伤害自己
-                }
+                if (hitbox.sourceEntity == hurtboxEntity) continue;
                 
                 // 安全检查
                 if (!hurtboxes.has(hurtboxEntity) || !targetTransforms.has(hurtboxEntity)) {
@@ -85,7 +72,6 @@ public:
                 
                 const auto& hurtbox = hurtboxes.get(hurtboxEntity);
                 
-                // 安全检查
                 if (hitbox.sourceEntity == INVALID_ENTITY) {
                     continue;
                 }
@@ -93,10 +79,9 @@ public:
                 // 命中历史检测
                 if (hasHitEntity(hitbox, hurtboxEntity)) continue;
                 
-                // ← Bug 2 修复：从 targetTransforms 获取 Hurtbox 位置
                 const auto& targetTransform = targetTransforms.get(hurtboxEntity);
                 
-                // 正确计算 Hurtbox 的世界坐标
+                // 计算 Hurtbox 的世界坐标
                 Rect hurtboxWorld = {
                     targetTransform.position.x + hurtbox.bounds.x,
                     targetTransform.position.y + hurtbox.bounds.y,
@@ -104,36 +89,82 @@ public:
                     hurtbox.bounds.height
                 };
                 
-                // ← 调试输出已禁用（高频日志）
-                // float hurtboxCenterX = hurtboxWorld.x + hurtboxWorld.width / 2.0f;
-                // float hurtboxCenterY = hurtboxWorld.y + hurtboxWorld.height / 2.0f;
-                // std::cout << "[Collision] Hurtbox center=(" << hurtboxCenterX << ", " << hurtboxCenterY 
-                //           << ") size=" << hurtboxWorld.width << "x" << hurtboxWorld.height;
-                
                 // AABB 碰撞检测
                 if (hitboxWorld.overlaps(hurtboxWorld)) {
-                    // std::cout << " -> HIT!\n";  // ← 已禁用
-                    
                     // 添加到命中历史
                     HitboxComponent& mutableHitbox = const_cast<HitboxComponent&>(hitbox);
                     addToHitHistory(mutableHitbox, hurtboxEntity);
                     
-                    // 挂载 DamageTag
-                    damageTags.add(hurtboxEntity, {
-                        .damage = static_cast<float>(hitbox.damageMultiplier)
-                    });
+                    // ← 【核心改动】计算伤害浮动并创建事件实体
+                    Entity eventEntity = createDamageEvent(
+                        ecs, damageEvents,
+                        hitbox, hurtboxEntity, hitbox.sourceEntity,
+                        hitboxWorld, hurtboxWorld
+                    );
                     
-                    std::cout << "[DamageSystem] Entity " << hurtboxEntity 
-                              << " took " << hitbox.damageMultiplier << " damage from Entity "
-                              << hitbox.sourceEntity << "\n";
-                } else {
-                    std::cout << " -> MISS\n";
+                    (void)eventEntity;  // 事件实体已创建，由 DamageSystem 处理
                 }
             }
         }
     }
     
 private:
+    /**
+     * @brief 创建伤害事件实体
+     * 
+     * @param ecs ECS 实例（用于创建实体）
+     * @param damageEvents DamageEventComponent 存储
+     * @param hitbox 命中的 Hitbox
+     * @param target 受击者实体 ID
+     * @param attacker 攻击者实体 ID
+     * @param hitboxWorld Hitbox 世界坐标
+     * @param hurtboxWorld Hurtbox 世界坐标
+     * @return 事件实体 ID
+     */
+    Entity createDamageEvent(
+        ECS& ecs,
+        ComponentStore<DamageEventComponent>& damageEvents,
+        const HitboxComponent& hitbox,
+        Entity target,
+        Entity attacker,
+        const Rect& hitboxWorld,
+        const Rect& hurtboxWorld)
+    {
+        Entity eventEntity = ecs.create();
+        
+        // ← 【核心改动】计算伤害浮动（0.8f ~ 1.2f）
+        float randomMultiplier = 0.8f + (static_cast<float>(std::rand()) / RAND_MAX) * 0.4f;
+        
+        // ← 【核心改动】判定暴击（浮动倍率 > 1.1f）
+        bool isCritical = (randomMultiplier > 1.1f);
+        
+        // ← 【核心改动】计算最终伤害
+        int actualDamage = static_cast<int>(hitbox.damageMultiplier * randomMultiplier);
+        
+        // ← 【核心改动】计算打击位置（两个碰撞框的中心点）
+        float hitX = (hitboxWorld.x + hitboxWorld.width / 2.0f + 
+                      hurtboxWorld.x + hurtboxWorld.width / 2.0f) / 2.0f;
+        float hitY = (hitboxWorld.y + hitboxWorld.height / 2.0f + 
+                      hurtboxWorld.y + hurtboxWorld.height / 2.0f) / 2.0f;
+        
+        // 挂载 DamageEventComponent
+        damageEvents.add(eventEntity, {
+            .target = target,
+            .actualDamage = actualDamage,
+            .hitPosition = {hitX, hitY},
+            .isCritical = isCritical,
+            .attacker = attacker,
+            .timestamp = 0.0f  // 由主循环设置
+        });
+        
+        std::cout << "[Collision] Created damage event: target=" << target 
+                  << " damage=" << actualDamage 
+                  << " (multiplier=" << randomMultiplier 
+                  << ", crit=" << (isCritical ? "YES" : "NO") << ")\n";
+        
+        return eventEntity;
+    }
+    
     bool hasHitEntity(const HitboxComponent& hitbox, Entity target) const {
         for (int i = 0; i < hitbox.hitCount && i < HitboxComponent::MAX_HIT_COUNT; ++i) {
             if (hitbox.hitHistory[i] == target) {

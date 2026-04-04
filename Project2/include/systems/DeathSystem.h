@@ -2,6 +2,11 @@
 #include "../core/Component.h"
 #include "../core/ECS.h"
 #include "../components/StateMachine.h"
+#include "../components/Transform.h"
+#include "../components/Character.h"
+#include "../components/Hurtbox.h"
+#include "../components/LootDrop.h"
+#include "../components/InputCommand.h"
 #include "../components/DeathTag.h"
 
 /**
@@ -10,15 +15,20 @@
  * 职责：
  * - 扫描所有 DeathTag
  * - 切换实体为 Dead 状态
- * - 【修复】真正销毁实体（包括所有组件）
- * - 销毁 DeathTag
+ * - 【关键修复】彻底清理所有组件，防止幽灵组件残留
+ * - 销毁实体 ID
  */
 class DeathSystem {
 public:
     void update(
         ComponentStore<StateMachineComponent>& states,
+        ComponentStore<TransformComponent>& transforms,
+        ComponentStore<CharacterComponent>& characters,
+        ComponentStore<HurtboxComponent>& hurtboxes,
+        ComponentStore<LootDropComponent>& lootDrops,
+        ComponentStore<InputCommand>& inputs,
         ComponentStore<DeathTag>& deathTags,
-        ECS& ecs,  // ← 新增：ECS 对象，用于真正抹杀实体
+        ECS& ecs,
         float dt)
     {
         (void)dt;
@@ -33,11 +43,18 @@ public:
                 state.stateTimer = 0.0f;
             }
             
-            // ← 【修复】真正从内存中抹除实体（包括 Transform, Hurtbox 等所有组件）
-            ecs.destroy(entity);
+            // ← 【关键修复】彻底清理所有组件，防止幽灵组件残留
+            if (transforms.has(entity)) transforms.remove(entity);
+            if (characters.has(entity)) characters.remove(entity);
+            if (hurtboxes.has(entity)) hurtboxes.remove(entity);
+            if (lootDrops.has(entity)) lootDrops.remove(entity);
+            if (inputs.has(entity)) inputs.remove(entity);
             
             // 销毁 DeathTag
             deathTags.remove(entity);
+            
+            // ← 【关键修复】最后销毁实体 ID
+            ecs.destroy(entity);
         }
     }
 };

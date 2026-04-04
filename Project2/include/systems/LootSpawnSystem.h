@@ -5,6 +5,7 @@
 #include "../components/LootDrop.h"
 #include "../components/ItemData.h"
 #include "../components/PickupBox.h"
+#include "../components/MagnetComponent.h"
 #include "../components/DeathTag.h"
 #include <cstdlib>
 
@@ -65,7 +66,11 @@ public:
                         .position = {transform.position.x + jitterX, transform.position.y + jitterY},
                         .scale = {1.0f, 1.0f},
                         .rotation = 0.0f,
-                        .velocity = {0.0f, 0.0f}
+                        // ← 新增：爆米花抛射效果（更快的初速度）
+                        .velocity = {
+                            (static_cast<float>(std::rand()) / RAND_MAX) * 120.0f - 60.0f,  // x: -60 ~ 60
+                            (static_cast<float>(std::rand()) / RAND_MAX) * -120.0f - 80.0f  // y: -200 ~ -80 (向上更快)
+                        }
                     });
                     
                     // 【修复】ItemData：物品数据
@@ -85,6 +90,8 @@ public:
                         .width = 20.0f,
                         .height = 20.0f
                     });
+                    
+                    // ← 不再给掉落物添加 MagnetComponent（现在 MagnetComponent 在玩家身上）
                 }
             }
             
