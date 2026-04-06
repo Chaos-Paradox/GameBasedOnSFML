@@ -323,7 +323,7 @@ int main() {
                     timeScale = (timeScale == 0.0f) ? 1.0f : 0.0f;  // 暂停/继续
                     std::cout << "[TimeScale] " << (timeScale == 0.0f ? "Paused" : "Running") << "\n";
                 }
-                if (kp->code == sf::Keyboard::Key::K) {
+                if (kp->code == sf::Keyboard::Key::RBracket) {  // ] 键
                     frameStep = true;  // 单帧步进
                     timeScale = 1.0f;  // 临时恢复时间
                 }
@@ -361,9 +361,8 @@ int main() {
         }
         lastSpacePressed = currentSpacePressed;
         
-        // ← 新增：跳跃输入（K 键或 W 键）
-        bool jumpPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::K) || 
-                          sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W);
+        // ← 新增：跳跃输入（K 键）
+        bool jumpPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::K);
         if (jumpPressed && zTransforms.has(player)) {
             auto& zComp = zTransforms.get(player);
             if (zComp.isGrounded()) {
