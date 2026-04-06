@@ -31,6 +31,7 @@
 #include "components/DashComponent.h"
 #include "components/DamageEventComponent.h"
 #include "components/ZTransformComponent.h"
+#include "components/ColliderComponent.h"
 
 #include "systems/StateMachineSystem.h"
 #include "systems/LocomotionSystem.h"
@@ -45,6 +46,7 @@
 #include "systems/CleanupSystem.h"
 #include "systems/DebugSystem.h"
 #include "systems/DashSystem.h"
+#include "systems/PhysicalCollisionSystem.h"
 
 constexpr int WINDOW_WIDTH = 1024;
 constexpr int WINDOW_HEIGHT = 768;
@@ -83,7 +85,8 @@ auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compo
                   ComponentStore<CharacterComponent>& characters, ComponentStore<InputCommand>& inputs,
                   ComponentStore<HurtboxComponent>& hurtboxes, ComponentStore<EvolutionComponent>& evolutions,
                   ComponentStore<DashComponent>& dashes, ComponentStore<MagnetComponent>& magnets,
-                  ComponentStore<ZTransformComponent>& zTransforms,  // ← 新增参数
+                  ComponentStore<ZTransformComponent>& zTransforms,
+                  ComponentStore<ColliderComponent>& colliders,  // ← 新增参数
                   float x, float y) {
     auto player = ecs.create();
     states.add(player, {CharacterState::Idle, CharacterState::Idle, 0.0f});
@@ -112,12 +115,18 @@ auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compo
         .magnetSpeed = 400.0f
     });
     
-    // ← 新增：赋予玩家 Z 轴能力（可以跳跃）
+    // 赋予玩家 Z 轴能力（可以跳跃）
     zTransforms.add(player, {
         .z = 0.0f,
         .vz = 0.0f,
         .gravity = -2000.0f,
-        .height = 40.0f  // 玩家物理高度
+        .height = 40.0f
+    });
+    
+    // ← 新增：赋予玩家圆柱体碰撞器（动态实体）
+    colliders.add(player, {
+        .radius = 20.0f,
+        .isStatic = false
     });
     
     return player;
@@ -125,7 +134,9 @@ auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compo
 
 auto createDummy(ECS& ecs, ComponentStore<StateMachineComponent>& states, ComponentStore<TransformComponent>& transforms,
                  ComponentStore<CharacterComponent>& characters, ComponentStore<HurtboxComponent>& hurtboxes,
-                 ComponentStore<LootDropComponent>& lootDrops, float x, float y) {
+                 ComponentStore<LootDropComponent>& lootDrops,
+                 ComponentStore<ColliderComponent>& colliders,  // ← 新增参数
+                 float x, float y) {
     auto dummy = ecs.create();
     states.add(dummy, {CharacterState::Idle, CharacterState::Idle, 0.0f});
     transforms.add(dummy, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, -1.0f, 0.0f});
@@ -138,29 +149,31 @@ auto createDummy(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compon
     dummyLoot.hasDropped = false;
     lootDrops.add(dummy, dummyLoot);
     
+    // ← 新增：赋予假人圆柱体碰撞器（动态实体）
+    colliders.add(dummy, {
+        .radius = 20.0f,
+        .isStatic = false
+    });
+    
     return dummy;
 }
 
-// ← 新增：渲染影子（当实体在空中时）
-void renderShadow(sf::RenderWindow& window, const TransformComponent& trans, float z) {
-    sf::CircleShape shadow(ENTITY_SIZE / 2.5f);
-    shadow.setOrigin({ENTITY_SIZE / 2.5f, ENTITY_SIZE / 2.5f});
-    shadow.setPosition({trans.position.x, trans.position.y});
-    
-    // 影子透明度随高度增加而降低
-    float alpha = std::max(50.0f, 200.0f - z * 3.0f);
-    shadow.setFillColor(sf::Color(0, 0, 0, static_cast<std::uint8_t>(alpha)));
-    window.draw(shadow);
-}
-
-// 渲染实体（支持 Z 轴视觉偏移）
+// 渲染实体（支持 Z 轴视觉偏移 + 通用影子）
 void renderEntity(sf::RenderWindow& window, const TransformComponent& trans, const CharacterComponent& chara,
                   const StateMachineComponent& state, bool isPlayer, const DashComponent* dash = nullptr,
                   const ZTransformComponent* zComp = nullptr) {
+    // ← 【2.5D 通用影子】永远绘制在逻辑坐标上
+    sf::CircleShape shadow(15.0f);
+    shadow.setOrigin({15.0f, 7.5f});        // 中心点偏移
+    shadow.setScale({1.0f, 0.5f});          // 压扁成 2.5D 椭圆形
+    shadow.setFillColor(sf::Color(0, 0, 0, 100));  // 半透明黑色
+    shadow.setPosition({trans.position.x, trans.position.y});
+    window.draw(shadow);
+    
     sf::RectangleShape rect({ENTITY_SIZE, ENTITY_SIZE});
     rect.setOrigin({ENTITY_SIZE / 2.0f, ENTITY_SIZE / 2.0f});
     
-    // ← 【核心改动】视觉 Y = 逻辑 Y - Z（空中实体要往上画）
+    // 视觉 Y = 逻辑 Y - Z（空中实体要往上画）
     float renderX = trans.position.x;
     float renderY = trans.position.y;
     if (zComp && zComp->z > 0.0f) {
@@ -279,6 +292,7 @@ int main() {
     ComponentStore<EvolutionComponent> evolutions;
     ComponentStore<DashComponent> dashes;
     ComponentStore<ZTransformComponent> zTransforms;  // ← 新增：Z 轴组件
+    ComponentStore<ColliderComponent> colliders;  // ← 新增：圆柱体碰撞器
 
     // System 初始化
     StateMachineSystem stateSystem;
@@ -294,9 +308,10 @@ int main() {
     CleanupSystem cleanupSystem;
     DebugSystem debugSystem;
     DashSystem dashSystem;
+    PhysicalCollisionSystem physicalCollisionSystem;  // ← 新增：物理碰撞系统
 
-    auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, dashes, magnets, zTransforms, 200, 300);
-    auto dummy = createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, 700, 300);
+    auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, dashes, magnets, zTransforms, colliders, 200, 300);
+    auto dummy = createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, colliders, 700, 300);
     
     // 🚀 神圣时间常数：锁死 60 Hz 物理运算
     const sf::Time TIME_PER_FRAME = sf::seconds(1.0f / 60.0f);
@@ -333,7 +348,7 @@ int main() {
             if (const auto* mb = event->getIf<sf::Event::MouseButtonPressed>()) {
                 if (mb->button == sf::Mouse::Button::Right) {
                     sf::Vector2f worldPos = window.mapPixelToCoords(mb->position);
-                    createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, worldPos.x, worldPos.y);
+                    createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, colliders, worldPos.x, worldPos.y);
                     std::cout << "Dummy created at (" << worldPos.x << ", " << worldPos.y << ")\n";
                 }
             }
@@ -404,6 +419,9 @@ int main() {
             // 位移执行系统（将冲刺速度化为实质距离）
             movementSystem.update(transforms, itemDatas, fixedDt);
             
+            // ← 新增：物理碰撞系统（圆柱体排斥，在 Movement 之后，战斗碰撞之前）
+            physicalCollisionSystem.update(colliders, transforms, fixedDt);
+            
             attackSystem.update(states, attackStates, transforms, characters, ecs, transforms, hitboxes, lifetimes, fixedDt);
             collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, zTransforms, damageEvents, ecs, fixedDt);
             damageSystem.update(characters, damageEvents, deathTags, states, dashes);
@@ -438,10 +456,7 @@ int main() {
             const DashComponent* dashPtr = dashes.has(entity) ? &dashes.get(entity) : nullptr;
             const ZTransformComponent* zPtr = zTransforms.has(entity) ? &zTransforms.get(entity) : nullptr;
             
-            // ← 新增：先画影子（如果实体在空中）
-            if (zPtr && zPtr->z > 0.0f) {
-                renderShadow(window, transforms.get(entity), zPtr->z);
-            }
+
             
             // 渲染实体本体（视觉 Y = 逻辑 Y - Z）
             renderEntity(window, transforms.get(entity), characters.get(entity), states.get(entity), isPlayer, dashPtr, zPtr);
