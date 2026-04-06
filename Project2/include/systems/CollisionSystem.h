@@ -4,6 +4,7 @@
 #include "../components/Hitbox.h"
 #include "../components/Hurtbox.h"
 #include "../components/Transform.h"
+#include "../components/ZTransformComponent.h"
 #include "../components/DamageEventComponent.h"
 #include "../math/Rect.h"
 #include <cstdlib>
@@ -32,6 +33,7 @@ public:
         const ComponentStore<HurtboxComponent>& hurtboxes,
         const ComponentStore<TransformComponent>& hitboxTransforms,
         const ComponentStore<TransformComponent>& targetTransforms,
+        const ComponentStore<ZTransformComponent>& zTransforms,  // ← 新增：Z 轴组件
         ComponentStore<DamageEventComponent>& damageEvents,  // ← 改为事件实体存储
         ECS& ecs,  // ← 新增：用于创建事件实体
         float dt)
@@ -52,7 +54,16 @@ public:
             
             const auto& hitboxTransform = hitboxTransforms.get(hitboxEntity);
             
-            // 计算 Hitbox 的世界坐标
+            // 获取 Hitbox 的 Z 轴数据（如果没有则 z=0, height=0）
+            float hitboxZ = 0.0f;
+            float hitboxHeight = 0.0f;
+            if (zTransforms.has(hitboxEntity)) {
+                const auto& zComp = zTransforms.get(hitboxEntity);
+                hitboxZ = zComp.z;
+                hitboxHeight = zComp.height;
+            }
+            
+            // 计算 Hitbox 的世界坐标（XY 平面）
             Rect hitboxWorld = {
                 hitboxTransform.position.x + hitbox.bounds.x,
                 hitboxTransform.position.y + hitbox.bounds.y,
@@ -81,7 +92,16 @@ public:
                 
                 const auto& targetTransform = targetTransforms.get(hurtboxEntity);
                 
-                // 计算 Hurtbox 的世界坐标
+                // 获取 Hurtbox 的 Z 轴数据（如果没有则 z=0, height=0）
+                float hurtboxZ = 0.0f;
+                float hurtboxHeight = 0.0f;
+                if (zTransforms.has(hurtboxEntity)) {
+                    const auto& zComp = zTransforms.get(hurtboxEntity);
+                    hurtboxZ = zComp.z;
+                    hurtboxHeight = zComp.height;
+                }
+                
+                // 计算 Hurtbox 的世界坐标（XY 平面）
                 Rect hurtboxWorld = {
                     targetTransform.position.x + hurtbox.bounds.x,
                     targetTransform.position.y + hurtbox.bounds.y,
@@ -89,13 +109,32 @@ public:
                     hurtbox.bounds.height
                 };
                 
-                // AABB 碰撞检测
+                // AABB 碰撞检测（XY 平面）
                 if (hitboxWorld.overlaps(hurtboxWorld)) {
+                    // ========== 【核心改动】Z 轴豁免判定 ==========
+                    // 影子重叠了！这时候再看 Z 轴高度
+                    float hitboxBottom = hitboxZ;
+                    float hitboxTop = hitboxZ + hitboxHeight;
+                    float hurtboxBottom = hurtboxZ;
+                    float hurtboxTop = hurtboxZ + hurtboxHeight;
+                    
+                    // 如果 Z 轴没有交集，说明一个在空中一个在地上，豁免碰撞
+                    // 逻辑：!(aBottom > bTop || aTop < bBottom) = Z 轴有交集
+                    bool zAxisOverlap = !(hitboxBottom > hurtboxTop || hitboxTop < hurtboxBottom);
+                    
+                    if (!zAxisOverlap) {
+                        // Z 轴豁免：虽然 XY 重叠，但高度不同，不会受伤
+                        std::cout << "[Collision] Z-axis豁免：hitboxZ=" << hitboxZ 
+                                  << " hurtboxZ=" << hurtboxZ << "\n";
+                        continue;
+                    }
+                    // ========== Z 轴判定结束 ==========
+                    
                     // 添加到命中历史
                     HitboxComponent& mutableHitbox = const_cast<HitboxComponent&>(hitbox);
                     addToHitHistory(mutableHitbox, hurtboxEntity);
                     
-                    // ← 【核心改动】计算伤害浮动并创建事件实体
+                    // 计算伤害浮动并创建事件实体
                     Entity eventEntity = createDamageEvent(
                         ecs, damageEvents,
                         hitbox, hurtboxEntity, hitbox.sourceEntity,

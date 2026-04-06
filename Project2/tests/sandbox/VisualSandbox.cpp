@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <cmath>
+#include <algorithm>
 
 #include "core/ECS.h"
 #include "core/Entity.h"
@@ -29,6 +30,7 @@
 #include "components/MagnetComponent.h"
 #include "components/DashComponent.h"
 #include "components/DamageEventComponent.h"
+#include "components/ZTransformComponent.h"
 
 #include "systems/StateMachineSystem.h"
 #include "systems/LocomotionSystem.h"
@@ -81,6 +83,7 @@ auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compo
                   ComponentStore<CharacterComponent>& characters, ComponentStore<InputCommand>& inputs,
                   ComponentStore<HurtboxComponent>& hurtboxes, ComponentStore<EvolutionComponent>& evolutions,
                   ComponentStore<DashComponent>& dashes, ComponentStore<MagnetComponent>& magnets,
+                  ComponentStore<ZTransformComponent>& zTransforms,  // ← 新增参数
                   float x, float y) {
     auto player = ecs.create();
     states.add(player, {CharacterState::Idle, CharacterState::Idle, 0.0f});
@@ -93,20 +96,28 @@ auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compo
     // 赋予玩家冲刺能力
     dashes.add(player, {
         .dashSpeed = 2000.0f, 
-        .dashDuration = 0.1f,  // ← 减半到 0.1 秒
-        .iframeDuration = 0.1f,  // ← 减半到 0.1 秒
+        .dashDuration = 0.1f,
+        .iframeDuration = 0.1f,
         .cooldown = 1.0f, 
         .dashTimer = 0.0f, 
         .cooldownTimer = 0.0f,
         .iframeTimer = 0.0f,
         .dashDir = {1.0f, 0.0f},
-        .isInvincible = false  // 只保留 isInvincible 用于渲染
+        .isInvincible = false
     });
     
-    // ← 新增：赋予玩家磁吸能力
+    // 赋予玩家磁吸能力
     magnets.add(player, {
-        .magnetRadius = 150.0f,  // 吸收半径 150 像素
-        .magnetSpeed = 400.0f    // 吸收速度 400 像素/秒
+        .magnetRadius = 150.0f,
+        .magnetSpeed = 400.0f
+    });
+    
+    // ← 新增：赋予玩家 Z 轴能力（可以跳跃）
+    zTransforms.add(player, {
+        .z = 0.0f,
+        .vz = 0.0f,
+        .gravity = -2000.0f,
+        .height = 40.0f  // 玩家物理高度
     });
     
     return player;
@@ -130,12 +141,33 @@ auto createDummy(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compon
     return dummy;
 }
 
-// 渲染实体（新增 Dash 参数用于渲染无敌帧特效）
+// ← 新增：渲染影子（当实体在空中时）
+void renderShadow(sf::RenderWindow& window, const TransformComponent& trans, float z) {
+    sf::CircleShape shadow(ENTITY_SIZE / 2.5f);
+    shadow.setOrigin({ENTITY_SIZE / 2.5f, ENTITY_SIZE / 2.5f});
+    shadow.setPosition({trans.position.x, trans.position.y});
+    
+    // 影子透明度随高度增加而降低
+    float alpha = std::max(50.0f, 200.0f - z * 3.0f);
+    shadow.setFillColor(sf::Color(0, 0, 0, static_cast<std::uint8_t>(alpha)));
+    window.draw(shadow);
+}
+
+// 渲染实体（支持 Z 轴视觉偏移）
 void renderEntity(sf::RenderWindow& window, const TransformComponent& trans, const CharacterComponent& chara,
-                  const StateMachineComponent& state, bool isPlayer, const DashComponent* dash = nullptr) {
+                  const StateMachineComponent& state, bool isPlayer, const DashComponent* dash = nullptr,
+                  const ZTransformComponent* zComp = nullptr) {
     sf::RectangleShape rect({ENTITY_SIZE, ENTITY_SIZE});
     rect.setOrigin({ENTITY_SIZE / 2.0f, ENTITY_SIZE / 2.0f});
-    rect.setPosition({trans.position.x, trans.position.y});
+    
+    // ← 【核心改动】视觉 Y = 逻辑 Y - Z（空中实体要往上画）
+    float renderX = trans.position.x;
+    float renderY = trans.position.y;
+    if (zComp && zComp->z > 0.0f) {
+        renderY -= zComp->z;
+    }
+    
+    rect.setPosition({renderX, renderY});
     
     sf::Color entityColor = isPlayer ? COLOR_PLAYER : COLOR_ENEMY;
 
@@ -246,6 +278,7 @@ int main() {
     ComponentStore<MagnetComponent> magnets;
     ComponentStore<EvolutionComponent> evolutions;
     ComponentStore<DashComponent> dashes;
+    ComponentStore<ZTransformComponent> zTransforms;  // ← 新增：Z 轴组件
 
     // System 初始化
     StateMachineSystem stateSystem;
@@ -262,7 +295,7 @@ int main() {
     DebugSystem debugSystem;
     DashSystem dashSystem;
 
-    auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, dashes, magnets, 200, 300);
+    auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, dashes, magnets, zTransforms, 200, 300);
     auto dummy = createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, 700, 300);
     
     // 🚀 神圣时间常数：锁死 60 Hz 物理运算
@@ -327,6 +360,17 @@ int main() {
             // 注意：DashSystem 直接从 inputs 读取意图，不需要额外信号
         }
         lastSpacePressed = currentSpacePressed;
+        
+        // ← 新增：跳跃输入（K 键或 W 键）
+        bool jumpPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::K) || 
+                          sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W);
+        if (jumpPressed && zTransforms.has(player)) {
+            auto& zComp = zTransforms.get(player);
+            if (zComp.isGrounded()) {
+                zComp.jump(800.0f);  // 跳跃初速度 800 像素/秒
+                std::cout << "[Jump] Player jumped! vz=800\n";
+            }
+        }
 
         // --- 神圣的 Fixed Timestep 物理循环 ---
         while (timeSinceLastUpdate >= TIME_PER_FRAME) {
@@ -351,11 +395,18 @@ int main() {
             
             magnetSystem.update(transforms, magnets, transforms, itemDatas, fixedDt);
             
+            // ← 新增：Z 轴物理更新（应用重力）
+            for (Entity entity : zTransforms.entityList()) {
+                if (zTransforms.has(entity)) {
+                    zTransforms.get(entity).applyGravity(fixedDt);
+                }
+            }
+            
             // 位移执行系统（将冲刺速度化为实质距离）
             movementSystem.update(transforms, itemDatas, fixedDt);
             
             attackSystem.update(states, attackStates, transforms, characters, ecs, transforms, hitboxes, lifetimes, fixedDt);
-            collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, damageEvents, ecs, fixedDt);
+            collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, zTransforms, damageEvents, ecs, fixedDt);
             damageSystem.update(characters, damageEvents, deathTags, states, dashes);
             
             lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
@@ -369,25 +420,46 @@ int main() {
         window.clear(COLOR_BACKGROUND);
         renderGrid(window);
         
+        // ← 【核心改动】Y-Sorting：按逻辑 Y 坐标排序（影子的 Y）
+        std::vector<Entity> renderOrder;
         for (Entity entity : characters.entityList()) {
-            if (!transforms.has(entity) || !states.has(entity)) continue;
-            
+            if (transforms.has(entity) && states.has(entity)) {
+                renderOrder.push_back(entity);
+            }
+        }
+        
+        // 按 Y 坐标排序（Y 值越大越晚渲染，画在最前面）
+        std::sort(renderOrder.begin(), renderOrder.end(), [&transforms](Entity a, Entity b) {
+            return transforms.get(a).position.y < transforms.get(b).position.y;
+        });
+        
+        // 按排序顺序渲染
+        for (Entity entity : renderOrder) {
             bool isPlayer = (entity == player);
             const DashComponent* dashPtr = dashes.has(entity) ? &dashes.get(entity) : nullptr;
+            const ZTransformComponent* zPtr = zTransforms.has(entity) ? &zTransforms.get(entity) : nullptr;
             
-            renderEntity(window, transforms.get(entity), characters.get(entity), states.get(entity), isPlayer, dashPtr);
+            // ← 新增：先画影子（如果实体在空中）
+            if (zPtr && zPtr->z > 0.0f) {
+                renderShadow(window, transforms.get(entity), zPtr->z);
+            }
+            
+            // 渲染实体本体（视觉 Y = 逻辑 Y - Z）
+            renderEntity(window, transforms.get(entity), characters.get(entity), states.get(entity), isPlayer, dashPtr, zPtr);
         }
         
         renderHitboxes(window, transforms, hitboxes);
         renderLoot(window, transforms, itemDatas);
         window.display();
         
-        // ← 【恢复】调试输出
+        // ← 调试输出
         if (debugClock.getElapsedTime().asSeconds() >= 1.0f) {
             const auto& evolution = evolutions.get(player);
+            float playerZ = zTransforms.has(player) ? zTransforms.get(player).z : 0.0f;
             std::cout << "Player HP: " << characters.get(player).currentHP
                       << " | Evo Points: " << evolution.evolutionPoints
                       << " | State: " << stateToString(states.get(player).currentState)
+                      << " | Z-Height: " << playerZ
                       << " | Loots: " << itemDatas.entityList().size()
                       << " | TimeScale: " << timeScale << "\n";
             debugClock.restart();
