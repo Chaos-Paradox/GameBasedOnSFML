@@ -56,11 +56,15 @@ public:
                 
                 auto& lootTransform = lootTransforms.get(loot);
                 
-                // ← 【修复 1】检查磁吸免疫计时器
+                // ← 【修复 1】检查磁吸免疫计时器（确保正常减少）
                 auto itemData = itemDatas.get(loot);
                 if (itemData.magnetImmunityTimer > 0.0f) {
-                    itemData.magnetImmunityTimer -= dt;
+                    itemData.magnetImmunityTimer -= dt;  // ← 确保每帧都减少
                     itemDatas.add(loot, itemData);  // 更新免疫时间
+                    
+                    // ← 【优化】免疫期间也施加阻尼，防止掉落物乱飞
+                    lootTransform.velocity.x *= 0.9f;
+                    lootTransform.velocity.y *= 0.9f;
                     continue;  // 免疫期间不执行吸附
                 }
                 
@@ -79,7 +83,7 @@ public:
                     lootTransform.velocity.x = dirX * playerMagnet.magnetSpeed;
                     lootTransform.velocity.y = dirY * playerMagnet.magnetSpeed;
                 } else {
-                    // ← 【修复 2】脱离吸附范围，施加摩擦力减速
+                    // ← 【修复 2】脱离吸附范围，施加摩擦力减速（0.9f 阻尼）
                     lootTransform.velocity.x *= 0.9f;
                     lootTransform.velocity.y *= 0.9f;
                 }

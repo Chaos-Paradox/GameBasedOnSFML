@@ -1,14 +1,6 @@
 /**
  * @file VisualSandbox.cpp
- * @brief 可视化调试沙盒 - 战斗管线测试（含战利品系统）
- * 
- * 功能：
- * - WASD 移动玩家
- * - J 键触发攻击
- * - 击杀怪物掉落进化点数
- * - 玩家拾取掉落物增加面板数值
- * - 血条显示
- * - 掉落物可视化（绿色圆圈）
+ * @brief 可视化调试沙盒 - 战斗管线测试（含冲刺与战利品系统）
  */
 
 #include <SFML/Graphics.hpp>
@@ -16,6 +8,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cmath>
 
 #include "core/ECS.h"
 #include "core/Entity.h"
@@ -34,7 +27,9 @@
 #include "components/PickupBox.h"
 #include "components/Evolution.h"
 #include "components/MagnetComponent.h"
-#include "components/DamageTextComponent.h"  // ← 新增：伤害飘字
+#include "components/DashComponent.h"
+#include "components/DamageEventComponent.h"
+
 #include "systems/StateMachineSystem.h"
 #include "systems/LocomotionSystem.h"
 #include "systems/MovementSystem.h"
@@ -47,26 +42,25 @@
 #include "systems/MagnetSystem.h"
 #include "systems/CleanupSystem.h"
 #include "systems/DebugSystem.h"
-#include "systems/DamageTextSpawnerSystem.h"  // ← 新增：飘字生成
-#include "systems/DamageTextRenderSystem.h"    // ← 新增：飘字渲染
+#include "systems/DashSystem.h"
 
 constexpr int WINDOW_WIDTH = 1024;
 constexpr int WINDOW_HEIGHT = 768;
 constexpr float ENTITY_SIZE = 40.0f;
-constexpr float DT = 1.0f / 60.0f;
 
 sf::Color COLOR_PLAYER(50, 200, 50);
 sf::Color COLOR_ENEMY(200, 50, 50);
 sf::Color COLOR_HURT(255, 100, 100);
 sf::Color COLOR_DEAD(100, 100, 100);
 sf::Color COLOR_HITBOX(255, 255, 0, 128);
-sf::Color COLOR_LOOT(50, 255, 50);  // ← 掉落物绿色
+sf::Color COLOR_LOOT(50, 255, 50); 
 sf::Color COLOR_BACKGROUND(30, 30, 30);
 
 std::string stateToString(CharacterState state) {
     switch(state) {
         case CharacterState::Idle: return "IDLE";
         case CharacterState::Move: return "MOVE";
+        case CharacterState::Dash: return "DASH";
         case CharacterState::Attack: return "ATTACK";
         case CharacterState::Hurt: return "HURT";
         case CharacterState::Dead: return "DEAD";
@@ -86,7 +80,7 @@ Vec2 getInputFromKeyboard() {
 auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, ComponentStore<TransformComponent>& transforms,
                   ComponentStore<CharacterComponent>& characters, ComponentStore<InputCommand>& inputs,
                   ComponentStore<HurtboxComponent>& hurtboxes, ComponentStore<EvolutionComponent>& evolutions,
-                  ComponentStore<MagnetComponent>& magnets,
+                  ComponentStore<DashComponent>& dashes, ComponentStore<MagnetComponent>& magnets,
                   float x, float y) {
     auto player = ecs.create();
     states.add(player, {CharacterState::Idle, CharacterState::Idle, 0.0f});
@@ -96,9 +90,22 @@ auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compo
     hurtboxes.add(player, {{-20, -20, 40, 40}, Faction::Player, 1, 0.0f});
     evolutions.add(player, {0, 0});
     
-    // ← 新增：玩家的磁吸组件（可通过装备修改）
+    // 赋予玩家冲刺能力
+    dashes.add(player, {
+        .dashSpeed = 2000.0f, 
+        .dashDuration = 0.1f,  // ← 减半到 0.1 秒
+        .iframeDuration = 0.1f,  // ← 减半到 0.1 秒
+        .cooldown = 1.0f, 
+        .dashTimer = 0.0f, 
+        .cooldownTimer = 0.0f,
+        .iframeTimer = 0.0f,
+        .dashDir = {1.0f, 0.0f},
+        .isInvincible = false  // 只保留 isInvincible 用于渲染
+    });
+    
+    // ← 新增：赋予玩家磁吸能力
     magnets.add(player, {
-        .magnetRadius = 200.0f,  // 吸收半径 200 像素（爽游体验：远距离吸附）
+        .magnetRadius = 150.0f,  // 吸收半径 150 像素
         .magnetSpeed = 400.0f    // 吸收速度 400 像素/秒
     });
     
@@ -114,9 +121,8 @@ auto createDummy(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compon
     characters.add(dummy, {"Dummy", 1, 100, 100, 10, 0, 0.0f, false, 0.0f, -1.0f, 0.0f});
     hurtboxes.add(dummy, {{-20, -20, 40, 40}, Faction::Enemy, 2, 0.0f});
     
-    // ← 修复：添加掉落表：100% 掉落 1 个进化点（itemId=1）
     LootDropComponent dummyLoot;
-    dummyLoot.lootTable[0] = {1, 1.0f, 1, 1, 0.0f, 400.0f};  // itemId, dropChance, minCount, maxCount, magnetRadius(0=关闭), magnetSpeed
+    dummyLoot.lootTable[0] = {1, 1.0f, 1, 1};
     dummyLoot.lootCount = 1;
     dummyLoot.hasDropped = false;
     lootDrops.add(dummy, dummyLoot);
@@ -124,32 +130,41 @@ auto createDummy(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compon
     return dummy;
 }
 
-// ← 修复 2：添加血条渲染
+// 渲染实体（新增 Dash 参数用于渲染无敌帧特效）
 void renderEntity(sf::RenderWindow& window, const TransformComponent& trans, const CharacterComponent& chara,
-                  const StateMachineComponent& state, bool isPlayer) {
-    // 绘制实体方块
+                  const StateMachineComponent& state, bool isPlayer, const DashComponent* dash = nullptr) {
     sf::RectangleShape rect({ENTITY_SIZE, ENTITY_SIZE});
     rect.setOrigin({ENTITY_SIZE / 2.0f, ENTITY_SIZE / 2.0f});
     rect.setPosition({trans.position.x, trans.position.y});
-    if (state.currentState == CharacterState::Dead) rect.setFillColor(COLOR_DEAD);
-    else if (state.currentState == CharacterState::Hurt) rect.setFillColor(COLOR_HURT);
-    else if (isPlayer) rect.setFillColor(COLOR_PLAYER);
-    else rect.setFillColor(COLOR_ENEMY);
+    
+    sf::Color entityColor = isPlayer ? COLOR_PLAYER : COLOR_ENEMY;
+
+    // 视觉反馈：渲染冲刺和无敌帧
+    if (state.currentState == CharacterState::Dead) {
+        entityColor = COLOR_DEAD;
+    } else if (state.currentState == CharacterState::Hurt) {
+        entityColor = COLOR_HURT;
+    } else if (state.currentState == CharacterState::Dash && dash != nullptr) {
+        if (dash->isInvincible) {
+            entityColor = sf::Color(0, 255, 255, 180); // 无敌期间显示半透明青色！
+        } else {
+            entityColor = sf::Color(isPlayer ? 50 : 200, 100, 100, 200); // 冲刺后摇
+        }
+    }
+
+    rect.setFillColor(entityColor);
     window.draw(rect);
     
-    // ← 绘制血条（在实体上方）
     float hpBarWidth = 40.0f;
     float hpBarHeight = 5.0f;
-    float hpBarY = trans.position.y - ENTITY_SIZE / 2.0f - 8.0f;  // 实体上方 8 像素
+    float hpBarY = trans.position.y - ENTITY_SIZE / 2.0f - 8.0f;
     
-    // 血条底色（红色）
     sf::RectangleShape hpBarBg({hpBarWidth, hpBarHeight});
     hpBarBg.setOrigin({hpBarWidth / 2.0f, hpBarHeight / 2.0f});
     hpBarBg.setPosition({trans.position.x, hpBarY});
     hpBarBg.setFillColor(sf::Color(200, 0, 0));
     window.draw(hpBarBg);
     
-    // 血条当前值（绿色）
     float hpPercent = static_cast<float>(chara.currentHP) / std::max(1, chara.maxHP);
     sf::RectangleShape hpBarFg({hpBarWidth * hpPercent, hpBarHeight});
     hpBarFg.setOrigin({0.0f, hpBarHeight / 2.0f});
@@ -174,15 +189,12 @@ void renderHitboxes(sf::RenderWindow& window, const ComponentStore<TransformComp
     }
 }
 
-// ← 修复 3：渲染掉落物（绿色小圆圈）
 void renderLoot(sf::RenderWindow& window, const ComponentStore<TransformComponent>& transforms,
                 const ComponentStore<ItemDataComponent>& itemDatas) {
     for (Entity loot : itemDatas.entityList()) {
         if (!transforms.has(loot)) continue;
         const auto& transform = transforms.get(loot);
-        
-        // 绘制绿色圆圈代表掉落物
-        sf::CircleShape lootCircle(8.0f);  // 半径 8 像素
+        sf::CircleShape lootCircle(8.0f);
         lootCircle.setOrigin({8.0f, 8.0f});
         lootCircle.setPosition({transform.position.x, transform.position.y});
         lootCircle.setFillColor(COLOR_LOOT);
@@ -206,21 +218,14 @@ void renderGrid(sf::RenderWindow& window) {
 }
 
 int main() {
-    std::cout << "=== Project2 Loot Pipeline Sandbox ===\n";
-    std::cout << "Controls: WASD to move, J to attack, Kill dummy to get evolution points!\n";
-    std::cout << "Debug: G = Show entity list, L = Show loot list\n";
-    std::cout << "Visual: Red bar = HP, Green circle = Loot, Floating text = Damage\n\n";
+    std::cout << "=== Project2 Fixed Timestep & Dash Sandbox ===\n";
     
-    sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Project2 Loot & Pickup Pipeline");
-    window.setFramerateLimit(60);
+    sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Project2 Fixed Timestep Sandbox");
+    window.setFramerateLimit(144); // 渲染帧率
     
-    // ← 新增：加载字体（用于伤害飘字）
-    sf::Font font;
-    if (!font.openFromFile("/System/Library/Fonts/Supplemental/Arial.ttf")) {
-        std::cerr << "[Error] Failed to load font!\n";
-        return 1;
-    }
-    std::cout << "[Main] Font loaded successfully\n";
+    // ← 【恢复】帧暂停和渐进功能
+    float timeScale = 1.0f;  // 时间缩放（1.0 = 正常，0.0 = 暂停）
+    bool frameStep = false;  // 单帧步进标志
     
     // ECS 初始化
     ECS ecs;
@@ -232,17 +237,16 @@ int main() {
     ComponentStore<AttackStateComponent> attackStates;
     ComponentStore<HitboxComponent> hitboxes;
     ComponentStore<LifetimeComponent> lifetimes;
-    ComponentStore<DamageEventComponent> damageEvents;  // ← 新增：伤害事件实体
-    ComponentStore<DamageTextComponent> damageTexts;    // ← 新增：伤害飘字
+    ComponentStore<DamageTag> damageTags;
+    ComponentStore<DamageEventComponent> damageEvents;
     ComponentStore<DeathTag> deathTags;
-    
-    // ← 战利品系统组件
     ComponentStore<LootDropComponent> lootDrops;
     ComponentStore<ItemDataComponent> itemDatas;
     ComponentStore<PickupBoxComponent> pickupBoxes;
-    ComponentStore<MagnetComponent> magnets;  // ← 新增：磁力组件
+    ComponentStore<MagnetComponent> magnets;
     ComponentStore<EvolutionComponent> evolutions;
-    
+    ComponentStore<DashComponent> dashes;
+
     // System 初始化
     StateMachineSystem stateSystem;
     LocomotionSystem locomotionSystem;
@@ -253,139 +257,138 @@ int main() {
     DeathSystem deathSystem;
     LootSpawnSystem lootSpawnSystem;
     PickupSystem pickupSystem;
-    MagnetSystem magnetSystem;  // ← 新增：磁力系统
+    MagnetSystem magnetSystem;
     CleanupSystem cleanupSystem;
-    DebugSystem debugSystem;    // ← 新增：调试系统
-    DamageTextSpawnerSystem damageTextSpawner;  // ← 新增：飘字生成
-    DamageTextRenderSystem damageTextRender;    // ← 新增：飘字渲染
-    
-    // 创建玩家（带磁吸组件）
-    auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, magnets, 200, 300);
-    
-    // 创建假人（带掉落表）
+    DebugSystem debugSystem;
+    DashSystem dashSystem;
+
+    auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, dashes, magnets, 200, 300);
     auto dummy = createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, 700, 300);
     
-    std::cout << "Player created at (200, 300)\n";
-    std::cout << "Dummy created at (700, 300) with 100% drop rate\n";
-    std::cout << "Press J to attack, walk over loot to pickup\n\n";
-    
+    // 🚀 神圣时间常数：锁死 60 Hz 物理运算
+    const sf::Time TIME_PER_FRAME = sf::seconds(1.0f / 60.0f);
+    sf::Time timeSinceLastUpdate = sf::Time::Zero;
     sf::Clock clock, debugClock;
     
+    // 输入缓存变量
+    bool lastJPressed = false;
+    bool lastSpacePressed = false;
+    bool dashPressedSignal = false;
+    
     while (window.isOpen()) {
-        float dt = clock.restart().asSeconds();
+        sf::Time dtTime = clock.restart();
+        timeSinceLastUpdate += dtTime;
         
-        // 事件处理
         while (const auto event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) window.close();
+            
+            // ← 【修复】ESC 键退出游戏
             if (const auto* kp = event->getIf<sf::Event::KeyPressed>()) {
                 if (kp->code == sf::Keyboard::Key::Escape) window.close();
                 
-                // ← 新增：调试按键
-                if (kp->code == sf::Keyboard::Key::G) {
-                    debugSystem.printEntityList(ecs, transforms, characters, states, itemDatas, evolutions);
+                // ← 【恢复】帧暂停和渐进功能
+                if (kp->code == sf::Keyboard::Key::P) {
+                    timeScale = (timeScale == 0.0f) ? 1.0f : 0.0f;  // 暂停/继续
+                    std::cout << "[TimeScale] " << (timeScale == 0.0f ? "Paused" : "Running") << "\n";
                 }
-                if (kp->code == sf::Keyboard::Key::L) {
-                    debugSystem.printLootList(transforms, itemDatas);
+                if (kp->code == sf::Keyboard::Key::K) {
+                    frameStep = true;  // 单帧步进
+                    timeScale = 1.0f;  // 临时恢复时间
                 }
             }
             
-            // ← 新增：鼠标右键点击生成假人
-            if (const auto* mb = event->getIf<sf::Event::MouseButtonReleased>()) {
+            // ← 右键点击生成假人
+            if (const auto* mb = event->getIf<sf::Event::MouseButtonPressed>()) {
                 if (mb->button == sf::Mouse::Button::Right) {
-                    // 获取鼠标位置（屏幕坐标 → 游戏世界坐标）
-                    sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-                    float worldX = static_cast<float>(mousePos.x);
-                    float worldY = static_cast<float>(mousePos.y);
-                    
-                    // 在鼠标位置生成假人
-                    auto newDummy = createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, worldX, worldY);
-                    std::cout << "Dummy created at (" << worldX << ", " << worldY << ")\n";
+                    sf::Vector2f worldPos = window.mapPixelToCoords(mb->position);
+                    createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, worldPos.x, worldPos.y);
+                    std::cout << "Dummy created at (" << worldPos.x << ", " << worldPos.y << ")\n";
                 }
             }
         }
         
-        // 玩家输入
+        // --- 循环外：抓取瞬时输入 ---
         inputs.get(player).moveDir = getInputFromKeyboard();
-        static bool lastJPressed = false;
+        
+        // ← 【核心修复】限时输入缓存：按键按下时赋予 0.2 秒保质期
         bool currentJPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::J);
-        inputs.get(player).attackPressed = currentJPressed && !lastJPressed;
+        if (currentJPressed && !lastJPressed) {
+            inputs.get(player).attackBufferTimer = 0.2f;  // 0.2 秒保质期
+        }
         lastJPressed = currentJPressed;
+
+        bool currentSpacePressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
+        if (currentSpacePressed && !lastSpacePressed) {
+            dashPressedSignal = true; // 缓存冲刺信号，直到被物理循环消费
+        }
+        lastSpacePressed = currentSpacePressed;
+
+        // --- 神圣的 Fixed Timestep 物理循环 ---
+        while (timeSinceLastUpdate >= TIME_PER_FRAME) {
+            timeSinceLastUpdate -= TIME_PER_FRAME;
+            float fixedDt = TIME_PER_FRAME.asSeconds() * timeScale;  // ← 应用 timeScale
+            
+            // 单帧步进逻辑
+            if (frameStep) {
+                frameStep = false;
+                timeScale = 0.0f;  // 步进后自动暂停
+                std::cout << "[FrameStep] Single frame executed\n";
+            }
+            
+            // 严格按照时序执行管线！
+            stateSystem.update(states, attackStates, inputs, damageEvents, ecs, fixedDt);
+            
+            // 冲刺系统吃掉输入信号，并赋予极高初速度
+            dashSystem.update(dashes, states, transforms, dashPressedSignal, fixedDt);
+            dashPressedSignal = false; // 消费完毕
+            
+            // 基础移动（内部有 if(state == Dash) return 保护）
+            locomotionSystem.update(states, transforms, characters, inputs, fixedDt);
+            
+            magnetSystem.update(transforms, magnets, transforms, itemDatas, fixedDt);
+            
+            // 位移执行系统（将冲刺速度化为实质距离）
+            movementSystem.update(transforms, itemDatas, fixedDt);
+            
+            attackSystem.update(states, attackStates, transforms, characters, ecs, transforms, hitboxes, lifetimes, fixedDt);
+            collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, damageEvents, ecs, fixedDt);
+            damageSystem.update(characters, damageEvents, deathTags, states, dashes);
+            
+            lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
+            deathSystem.update(states, transforms, characters, hurtboxes, lootDrops, inputs, deathTags, ecs, fixedDt);
+            
+            pickupSystem.update(ecs, evolutions, transforms, transforms, itemDatas, pickupBoxes, magnets);
+            cleanupSystem.update(lifetimes, transforms, hitboxes, magnets, itemDatas, pickupBoxes, damageEvents, ecs, fixedDt);
+        }
         
-        // ========== 战斗管线 ==========
-        stateSystem.update(states, attackStates, inputs, damageEvents, ecs, dt);
-        
-        // ← 【核心改动】CollisionSystem：创建伤害事件实体
-        collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, damageEvents, ecs, dt);
-        
-        // ← 【核心改动】DamageSystem：读取事件实体并结算
-        damageSystem.update(characters, damageEvents, deathTags);
-        
-        // 4. LootSpawnSystem ⭐【新增】(抢在尸体被清空前，生成掉落物)
-        lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
-        
-        // 5. DeathSystem ← 【关键修复】传入所有组件存储，彻底清理
-        deathSystem.update(states, transforms, characters, hurtboxes, lootDrops, inputs, deathTags, ecs, dt);
-        
-        locomotionSystem.update(states, transforms, characters, inputs, dt);
-        
-        // ← 【关键设计】MagnetSystem：玩家拥有吸收半径
-        // 时序：必须在 MovementSystem 之前执行
-        magnetSystem.update(transforms, magnets, transforms, itemDatas, dt);
-        
-        // 统一运动系统（执行所有 velocity 的位移）
-        movementSystem.update(transforms, dt);
-        
-        attackSystem.update(states, attackStates, transforms, characters, ecs, transforms, hitboxes, lifetimes, dt);
-        
-        // ← 【核心改动】CollisionSystem：创建伤害事件实体
-        collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, damageEvents, ecs, dt);
-        
-        // ← 【核心改动】DamageSystem：读取事件实体并结算（攻击命中后）
-        damageSystem.update(characters, damageEvents, deathTags);
-        
-        // 10. PickupSystem ⭐【修复】(拾取判定：吃掉落物，加点数，销毁掉落物)
-        // ← 【关键】ecs 必须作为第一个参数，并传入 magnets 用于清理
-        pickupSystem.update(ecs, evolutions, transforms, transforms, itemDatas, pickupBoxes, magnets);
-        
-        // ← 【新增】伤害飘字生成（在 Cleanup 之前，确保事件还在）
-        damageTextSpawner.update(damageEvents, damageTexts, ecs);
-        
-        // 11. CleanupSystem ⭐【清理】(销毁到期实体和事件)
-        cleanupSystem.update(lifetimes, transforms, hitboxes, magnets, itemDatas, pickupBoxes, damageEvents, ecs, dt);
-        
-        // ← 【关键修复 3】纯 ECS 渲染：直接遍历 characters.entityList()
-        // 渲染
+        // --- 循环外：纯渲染 ---
         window.clear(COLOR_BACKGROUND);
         renderGrid(window);
         
-        // 渲染所有实体（玩家=绿色，假人=红色）
-        auto entityList = characters.entityList();
-        for (Entity entity : entityList) {
+        for (Entity entity : characters.entityList()) {
             if (!transforms.has(entity) || !states.has(entity)) continue;
             
             bool isPlayer = (entity == player);
-            renderEntity(window, transforms.get(entity), characters.get(entity), states.get(entity), isPlayer);
+            const DashComponent* dashPtr = dashes.has(entity) ? &dashes.get(entity) : nullptr;
+            
+            renderEntity(window, transforms.get(entity), characters.get(entity), states.get(entity), isPlayer, dashPtr);
         }
         
         renderHitboxes(window, transforms, hitboxes);
-        renderLoot(window, transforms, itemDatas);  // ← 渲染掉落物
-        
-        // ← 【新增】渲染伤害飘字
-        damageTextRender.update(damageTexts, window, font, ecs, dt);
-        
+        renderLoot(window, transforms, itemDatas);
         window.display();
         
-        // 调试输出（低频）
+        // ← 【恢复】调试输出
         if (debugClock.getElapsedTime().asSeconds() >= 1.0f) {
             const auto& evolution = evolutions.get(player);
             std::cout << "Player HP: " << characters.get(player).currentHP
                       << " | Evo Points: " << evolution.evolutionPoints
                       << " | State: " << stateToString(states.get(player).currentState)
-                      << " | Loots: " << itemDatas.entityList().size() << "\n";
+                      << " | Loots: " << itemDatas.entityList().size()
+                      << " | TimeScale: " << timeScale << "\n";
             debugClock.restart();
         }
     }
     
-    std::cout << "\nSandbox closed.\n";
     return 0;
 }

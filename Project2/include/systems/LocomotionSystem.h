@@ -9,19 +9,7 @@
 /**
  * @brief 位移系统（速度计算）
  * 
- * 职责：
- * - 读取 StateMachineComponent.currentState
- * - 读取 InputCommand.moveDir（连续向量）
- * - 读取 CharacterComponent.baseMoveSpeed
- * - 计算并写入 TransformComponent.velocity
- * 
- * ⚠️ 架构升级：从"离散指令"转向"连续向量"
- * ⚠️ 关键修复：向量归一化（Normalize），防止斜向移动变快 41%
- * 
- * ⚠️ facing 方向修复：
- * - facing 应该保存**未归一化的方向**（如 (1, -1) 表示右上）
- * - 这样攻击时 Hitbox 会出现在正确的方向
- * - 速度计算时才使用归一化后的方向
+ * ⚠️ 关键设计：Dash 状态下绝对不修改速度！
  */
 class LocomotionSystem {
 public:
@@ -43,6 +31,14 @@ public:
                 continue;
             }
             
+            // ← 【关键】状态拦截：Dash/Attack/Hurt/Dead 状态下绝对不修改速度！
+            if (state.currentState == CharacterState::Dash ||
+                state.currentState == CharacterState::Attack ||  // ← 新增：攻击时定住脚步
+                state.currentState == CharacterState::Hurt ||
+                state.currentState == CharacterState::Dead) {
+                continue;  // 让 DashSystem/MovementSystem 控制速度
+            }
+            
             auto& transform = transforms.get(entity);
             
             if (!characters.has(entity)) {
@@ -58,33 +54,27 @@ public:
             
             const auto& input = inputs.get(entity);
             
-            // 只在 Move 状态下处理移动
-            if (state.currentState == CharacterState::Move) {
-                Vec2 dir = input.moveDir;
+            // 只在 Move/Idle 状态下处理移动
+            Vec2 dir = input.moveDir;
+            
+            // 如果有移动输入
+            if (dir.x != 0.0f || dir.y != 0.0f) {
+                // 保存未归一化的方向作为 facing（用于攻击方向）
+                transform.facingX = dir.x;
+                transform.facingY = dir.y;
                 
-                // 如果有移动输入
-                if (dir.x != 0.0f || dir.y != 0.0f) {
-                    // 保存未归一化的方向作为 facing（用于攻击方向）
-                    transform.facingX = dir.x;
-                    transform.facingY = dir.y;
-                    
-                    // 向量归一化，防止斜向移动变快
-                    float length = std::sqrt(dir.x * dir.x + dir.y * dir.y);
-                    if (length > 0.0f) {
-                        dir.x /= length;
-                        dir.y /= length;
-                    }
-                    
-                    // 应用基础速度（使用归一化后的方向）
-                    transform.velocity.x = dir.x * character.baseMoveSpeed;
-                    transform.velocity.y = dir.y * character.baseMoveSpeed;
-                } else {
-                    transform.velocity = {0.0f, 0.0f};
+                // 向量归一化，防止斜向移动变快
+                float length = std::sqrt(dir.x * dir.x + dir.y * dir.y);
+                if (length > 0.0f) {
+                    dir.x /= length;
+                    dir.y /= length;
                 }
+                
+                // 应用基础速度（使用归一化后的方向）
+                transform.velocity.x = dir.x * character.baseMoveSpeed;
+                transform.velocity.y = dir.y * character.baseMoveSpeed;
             } else {
-                // 非 Move 状态，速度归零
                 transform.velocity = {0.0f, 0.0f};
-                // facing 保持不变，保持最后移动方向
             }
         }
     }

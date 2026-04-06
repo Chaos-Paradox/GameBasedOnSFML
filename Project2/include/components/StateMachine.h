@@ -3,11 +3,12 @@
 
 // CharacterState 枚举定义
 enum class CharacterState : uint8_t {
-    Idle,
-    Move,
-    Attack,
-    Hurt,
-    Dead,
+    Idle,       // 待机
+    Move,       // 移动
+    Attack,     // 攻击
+    Dash,       // 冲刺（新增）
+    Hurt,       // 受伤
+    Dead,       // 死亡
 };
 
 /**

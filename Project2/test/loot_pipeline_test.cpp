@@ -46,6 +46,7 @@ protected:
     ComponentStore<DeathTag> deathTags;
     ComponentStore<StateMachineComponent> states;
     ComponentStore<MagnetComponent> magnets;
+    ComponentStore<DashComponent> dashes;  // ← 新增：冲刺组件
     
     DamageSystem damageSystem;
     LootSpawnSystem lootSpawnSystem;
@@ -181,7 +182,7 @@ TEST_F(LootPipelineTest, FullPipeline_KillDropPickup) {
     });
     
     // 4. 运行 DamageSystem
-    damageSystem.update(characters, damageEvents, deathTags);
+    damageSystem.update(characters, damageEvents, deathTags, states, dashes);
     
     // 5. 运行 LootSpawnSystem
     lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);

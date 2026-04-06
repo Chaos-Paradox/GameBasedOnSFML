@@ -1,7 +1,7 @@
 # 00_ARCHITECTURE.md - Project2 架构地图
 
 > **多人共斗游戏核心架构，与渲染解耦**  
-> **版本:** 2.0（无 SFML 依赖） | **最后更新:** 2026-03-29
+> **版本:** 3.0（完整战斗系统） | **最后更新:** 2026-04-06
 
 ---
 
@@ -309,6 +309,13 @@ namespace Math {
 | `MagnetComponent` | `float magnetRadius`<br>`float magnetSpeed` | 玩家吸收半径 |
 | `LifetimeComponent` | `float timeLeft`<br>`bool autoDestroy` | 临时实体生命周期 |
 
+### 冲刺与输入 Component（新增 ✅）
+
+| Component | 字段 | 用途 |
+|-----------|------|------|
+| `DashComponent` | `float dashSpeed`<br>`float dashDuration`<br>`float iframeDuration`<br>`float cooldown`<br>`float dashTimer`<br>`float iframeTimer`<br>`Vec2 dashDir`<br>`bool isInvincible` | 冲刺能力数据 |
+| `InputCommand` | `Vec2 moveDir`<br>`float attackBufferTimer` | 输入命令（限时缓存） |
+
 ---
 
 ## 🎯 设计原则
@@ -343,6 +350,7 @@ namespace Math {
 
 | 版本 | 日期 | 改动 | 负责人 |
 |------|------|------|--------|
+| **3.0** | **2026-04-06** | **完整战斗系统：冲刺、攻击取消、限时输入缓存、帧暂停** | **AI Assistant** |
 | 2.2 | 2026-04-03 | 添加战利品与拾取系统（Loot/Magnet/Pickup） | AI Assistant |
 | 2.1 | 2026-04-03 | 修复幽灵惯性 Bug，添加爆米花抛射效果 | AI Assistant |
 | 2.0 | 2026-03-29 | 移除所有 SFML 依赖，使用自定义数学类型 | AI Assistant |
@@ -351,5 +359,5 @@ namespace Math {
 ---
 
 **维护者:** Project2 Team  
-**最后更新:** 2026-03-29  
+**最后更新:** 2026-04-06  
 **下次审查:** 添加新 System 或 Component 时

@@ -3,6 +3,8 @@
 #include "../components/DamageEventComponent.h"
 #include "../components/DeathTag.h"
 #include "../components/Character.h"
+#include "../components/StateMachine.h"
+#include "../components/DashComponent.h"
 #include <iostream>
 
 /**
@@ -24,7 +26,9 @@ public:
     void update(
         ComponentStore<CharacterComponent>& characters,
         const ComponentStore<DamageEventComponent>& damageEvents,  // ← 改为读取事件
-        ComponentStore<DeathTag>& deathTags)
+        ComponentStore<DeathTag>& deathTags,
+        const ComponentStore<StateMachineComponent>& states,      // ← 新增：检查状态
+        const ComponentStore<DashComponent>& dashes)              // ← 新增：检查无敌帧
     {
         auto entities = damageEvents.entityList();
         for (Entity eventEntity : entities) {
@@ -36,6 +40,12 @@ public:
             }
             
             if (characters.has(event.target)) {
+                // ← 【核心改动】检查是否处于冲刺无敌帧
+                if (isInvincible(event.target, states, dashes)) {
+                    std::cout << "[Combat] Dodge! Damage avoided during i-frames.\n";
+                    continue;  // 跳过伤害结算
+                }
+                
                 auto& character = characters.get(event.target);
                 int oldHP = character.currentHP;
                 character.currentHP -= event.actualDamage;
@@ -60,5 +70,36 @@ public:
             
             // ← 【核心改动】不再销毁事件实体（由 CleanupEventSystem 统一处理）
         }
+    }
+    
+private:
+    /**
+     * @brief 检查实体是否处于无敌状态
+     * 
+     * @param entity 实体 ID
+     * @param states StateMachineComponent 存储
+     * @param dashes DashComponent 存储
+     * @return true = 无敌，false = 可受伤
+     */
+    bool isInvincible(
+        Entity entity,
+        const ComponentStore<StateMachineComponent>& states,
+        const ComponentStore<DashComponent>& dashes)
+    {
+        // 检查是否处于 Dash 状态
+        if (states.has(entity)) {
+            const auto& state = states.get(entity);
+            if (state.currentState == CharacterState::Dash) {
+                // 检查是否有 DashComponent 且处于无敌帧
+                if (dashes.has(entity)) {
+                    const auto& dash = dashes.get(entity);
+                    if (dash.isInvincible && dash.iframeTimer > 0.0f) {
+                        return true;  // 无敌帧中
+                    }
+                }
+            }
+        }
+        
+        return false;  // 不无敌
     }
 };

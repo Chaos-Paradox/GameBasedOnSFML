@@ -3,28 +3,26 @@
 #include "../core/ECS.h"
 #include "../components/StateMachine.h"
 #include "../components/InputCommand.h"
-#include "../components/DamageEventComponent.h"  // ← 改为事件组件
+#include "../components/DamageEventComponent.h"
 #include "../components/AttackState.h"
 
 /**
  * @brief 状态机系统
  * 
- * 职责：
- * - 读取 InputCommand 和 DamageEventComponent
- * - 切换 StateMachineComponent.currentState
- * - 受伤时强制切换为 Hurt 状态
- * - 进入/离开 Attack 状态时添加/移除 AttackStateComponent
- * 
- * ⚠️ Bug 1 修复：使用 AttackStateComponent 做单次触发锁
- * ⚠️ 架构升级：通过 DamageEventComponent 检测受伤
+ * ⚠️ 严格架构：
+ * 1. 获取组件数据
+ * 2. 倒计时 attackBufferTimer（限时输入缓存）
+ * 3. 判定当前状态的可打断性 (Cancel Window)
+ * 4. 严格优先级的指令消费树 (Token Consumption)
+ * 5. 只在成功切入 Attack 时清零 attackBufferTimer（精准消费）
  */
 class StateMachineSystem {
 public:
     void update(
         ComponentStore<StateMachineComponent>& states,
         ComponentStore<AttackStateComponent>& attackStates,
-        const ComponentStore<InputCommand>& inputs,
-        const ComponentStore<DamageEventComponent>& damageEvents,  // ← 改为事件组件
+        ComponentStore<InputCommand>& inputs,
+        const ComponentStore<DamageEventComponent>& damageEvents,
         ECS& ecs,
         float dt)
     {
@@ -32,9 +30,54 @@ public:
         
         auto entities = states.entityList();
         for (Entity entity : entities) {
+            // ========== 1. 获取组件数据 ==========
             auto& state = states.get(entity);
             
-            // ← 【核心改动】检查是否受到攻击（遍历事件实体）
+            // 获取输入（如果没有则创建临时对象）
+            InputCommand input{Vec2{0.0f, 0.0f}, 0.0f};
+            if (inputs.has(entity)) {
+                input = inputs.get(entity);
+            }
+            
+            // ========== 2. 倒计时 attackBufferTimer（限时输入缓存） ==========
+            if (inputs.has(entity) && input.attackBufferTimer > 0.0f) {
+                input.attackBufferTimer -= dt;
+                if (input.attackBufferTimer < 0.0f) {
+                    input.attackBufferTimer = 0.0f;
+                }
+                inputs.get(entity).attackBufferTimer = input.attackBufferTimer;
+            }
+            
+            // ========== 3. 判定当前状态的可打断性 (Cancel Window) ==========
+            bool canBeInterrupted = true;
+            bool canCancelAttack = false;
+            
+            // 不可打断状态
+            if (state.currentState == CharacterState::Dash ||
+                state.currentState == CharacterState::Hurt ||
+                state.currentState == CharacterState::Dead) {
+                canBeInterrupted = false;
+            }
+            
+            // Attack 状态的可打断窗口（Hitbox 已创建且过了 0.05 秒）
+            if (state.currentState == CharacterState::Attack) {
+                const bool hasAttackState = attackStates.has(entity);
+                if (hasAttackState) {
+                    const auto& attackState = attackStates.get(entity);
+                    if (attackState.hitActivated && attackState.hitTimer <= 0.1f) {
+                        canCancelAttack = true;  // 允许移动取消后摇
+                    }
+                }
+            }
+            
+            // 不可打断状态直接跳过
+            if (!canBeInterrupted) {
+                continue;
+            }
+            
+            // ========== 4. 严格优先级的指令消费树 (Token Consumption) ==========
+            
+            // --- 最高优先级：受伤事件（强制打断）---
             bool isHit = false;
             auto eventEntities = damageEvents.entityList();
             for (Entity eventEntity : eventEntities) {
@@ -45,89 +88,86 @@ public:
                 }
             }
             
-            // 优先检查受伤事件
             if (isHit) {
-                // ← Bug 1 修复：离开 Attack 状态时移除 AttackStateComponent
-                if (state.currentState == CharacterState::Attack) {
-                    ecs.removeComponent<AttackStateComponent>(entity, attackStates);
-                }
-                
                 state.currentState = CharacterState::Hurt;
                 state.previousState = CharacterState::Hurt;
                 state.stateTimer = 0.5f;
                 continue;
             }
             
-            // 状态计时和恢复
+            // --- 状态计时和恢复 ---
             if (state.stateTimer > 0.0f) {
                 state.stateTimer -= dt;
                 
-                // Hurt 状态结束
                 if (state.stateTimer <= 0.0f && state.currentState == CharacterState::Hurt) {
                     state.currentState = CharacterState::Idle;
-                }
-                
-                // ← Bug 1 修复：Attack 状态结束，移除 AttackStateComponent
-                if (state.stateTimer <= 0.0f && state.currentState == CharacterState::Attack) {
-                    state.currentState = CharacterState::Idle;
-                    ecs.removeComponent<AttackStateComponent>(entity, attackStates);
+                    state.previousState = CharacterState::Idle;
                 }
             }
             
-            // ← 架构升级：根据 moveDir 向量判断状态
-            Vec2 moveDir = inputs.has(entity) ? inputs.get(entity).moveDir : Vec2{0.0f, 0.0f};
-            bool attackPressed = inputs.has(entity) ? inputs.get(entity).attackPressed : false;
-            
-            // 优先处理攻击输入
-            if (attackPressed && state.currentState != CharacterState::Attack &&
-                state.currentState != CharacterState::Hurt && state.currentState != CharacterState::Dead) {
-                state.currentState = CharacterState::Attack;
-                state.previousState = CharacterState::Attack;
-                state.stateTimer = 0.3f;
+            // --- Attack 状态处理（可取消窗口）---
+            if (state.currentState == CharacterState::Attack) {
+                const bool hasAttackState = attackStates.has(entity);
                 
-                // ← Bug 1 修复：切入 Attack 状态时添加 AttackStateComponent
-                ecs.addComponent<AttackStateComponent>(entity, attackStates, {
-                    .hitTimer = 0.0f,
-                    .hitDuration = 0.3f,
-                    .hitActivated = false  // ← 关键：未激活锁
-                });
-                
-                // ← Bug 1 修复：重置攻击标志，防止持续触发
-                // 注意：只在进入 Attack 状态时重置一次
-                if (inputs.has(entity)) {
-                    const_cast<InputCommand&>(inputs.get(entity)).attackPressed = false;
+                // 攻击时间到，自动释放回 Idle
+                // ← 【核心修复 2】禁止手动清零 attackBufferTimer，让时间自然流逝过期
+                if (hasAttackState && attackStates.get(entity).hitTimer <= 0.0f) {
+                    state.currentState = CharacterState::Idle;
+                    state.previousState = CharacterState::Idle;
+                    
+                    // ← 禁止在这里清零 attackBufferTimer！
+                    // inputs.get(entity).attackBufferTimer = 0.0f;  ❌ 错误！
+                    
+                    continue;
                 }
+                
+                // 可取消窗口：移动指令抢占状态
+                // ← 【核心修复 2】禁止手动清零 attackBufferTimer，让时间自然流逝过期
+                if (canCancelAttack && (input.moveDir.x != 0.0f || input.moveDir.y != 0.0f)) {
+                    state.currentState = CharacterState::Move;
+                    state.previousState = CharacterState::Move;
+                    
+                    // ← 禁止在这里清零 attackBufferTimer！
+                    // inputs.get(entity).attackBufferTimer = 0.0f;  ❌ 错误！
+                    
+                    continue;
+                }
+                
+                // 攻击进行中，不处理其他输入
                 continue;
             }
             
-            CharacterState newState = decideState(state, moveDir);
-            
-            if (newState != state.currentState) {
-                state.currentState = newState;
-                state.previousState = newState;
-                state.stateTimer = 0.0f;
+            // --- 攻击指令（最高优先级）---
+            // ← 【核心修复 1】精准消费：只有成功切入 Attack 时才清零 attackBufferTimer
+            if (input.attackBufferTimer > 0.0f) {
+                state.currentState = CharacterState::Attack;
+                state.previousState = CharacterState::Attack;
                 
-                // ← Bug 1 修复：离开 Attack 状态时移除 AttackStateComponent
-                if (state.currentState != CharacterState::Attack) {
-                    ecs.removeComponent<AttackStateComponent>(entity, attackStates);
+                // 初始化攻击状态组件
+                ecs.addComponent<AttackStateComponent>(entity, attackStates, {
+                    .hitTimer = 0.15f,
+                    .hitDuration = 0.15f,
+                    .hitActivated = false
+                });
+                
+                // ← 【核心修复 1】精准消费：清零 attackBufferTimer
+                if (inputs.has(entity)) {
+                    inputs.get(entity).attackBufferTimer = 0.0f;
                 }
+                
+                continue;
+            }
+            
+            // --- 移动指令（次级优先级）---
+            if (input.moveDir.x != 0.0f || input.moveDir.y != 0.0f) {
+                state.currentState = CharacterState::Move;
+                state.previousState = CharacterState::Move;
+            }
+            // --- 待机（最低优先级）---
+            else {
+                state.currentState = CharacterState::Idle;
+                state.previousState = CharacterState::Idle;
             }
         }
-    }
-    
-private:
-    // ← 架构升级：根据 Vec2 向量判断状态
-    CharacterState decideState(const StateMachineComponent& state, const Vec2& moveDir) const {
-        // Hurt 和 Dead 状态不可打断
-        if (state.currentState == CharacterState::Hurt || 
-            state.currentState == CharacterState::Dead) {
-            return state.currentState;
-        }
-        
-        // ← 架构升级：检查向量是否为 {0, 0}
-        if (moveDir.x != 0.0f || moveDir.y != 0.0f) {
-            return CharacterState::Move;
-        }
-        return CharacterState::Idle;
     }
 };

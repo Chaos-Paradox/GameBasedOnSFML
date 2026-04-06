@@ -12,23 +12,17 @@
 /**
  * @brief 攻击判定系统
  * 
- * 职责：
- * - 监听同时拥有 StateMachineComponent 和 AttackStateComponent 的实体
- * - **只在 hitActivated == false 时创建一次 Hitbox**
- * - Hitbox 位置 = 攻击者位置 + facing 方向 * 50 像素
- * 
- * ⚠️ 修复：渲染和判定不一致
- * - AttackSystem: transform.position + bounds (bounds 包含 facing 偏移)
- * - CollisionSystem: transform.position + bounds ✓
- * - renderHitboxes: transform.position + bounds ✓
- * 三者统一！
+ * ⚠️ 关键设计：
+ * - 攻击开始第一帧瞬间定身（velocity = 0）
+ * - 不施加摩擦力衰减（干脆利落）
+ * - hitTimer <= 0 时立刻释放回 Idle（切除后摇）
  */
 class AttackSystem {
 public:
     void update(
-        const ComponentStore<StateMachineComponent>& states,
+        ComponentStore<StateMachineComponent>& states,
         ComponentStore<AttackStateComponent>& attackStates,
-        const ComponentStore<TransformComponent>& transforms,
+        ComponentStore<TransformComponent>& transforms,
         const ComponentStore<CharacterComponent>& characters,
         ECS& ecs,
         ComponentStore<TransformComponent>& hitboxTransforms,
@@ -36,51 +30,70 @@ public:
         ComponentStore<LifetimeComponent>& lifetimes,
         float dt)
     {
-        (void)dt;
         (void)characters;
-        (void)states;
         
-        // 遍历同时拥有 AttackStateComponent 的实体
         auto entities = attackStates.entityList();
         for (Entity entity : entities) {
+            auto& state = states.get(entity);
             auto& attackState = attackStates.get(entity);
             
-            // 只有 hitActivated == false 时才创建 Hitbox
-            if (attackState.hitActivated) {
-                continue;  // 已激活过，跳过
+            // 状态拦截
+            if (state.currentState == CharacterState::Dash ||
+                state.currentState == CharacterState::Hurt ||
+                state.currentState == CharacterState::Dead) {
+                continue;
             }
             
-            // 安全检查：确保攻击者有 Transform
+            // ← 【核心】攻击状态处理
+            if (state.currentState == CharacterState::Attack) {
+                // 减少攻击计时器
+                attackState.hitTimer -= dt;
+                
+                // ← 【切除后摇】计时器到 0 立刻释放回 Idle
+                if (attackState.hitTimer <= 0.0f) {
+                    state.currentState = CharacterState::Idle;
+                    state.previousState = CharacterState::Idle;
+                    state.stateTimer = 0.0f;
+                    
+                    std::cout << "[AttackSystem] Attack finished! Released to Idle.\n";
+                }
+                
+                // 已创建过 Hitbox 则跳过
+                if (attackState.hitActivated) {
+                    continue;
+                }
+                
+                // ← 【瞬间定身】攻击开始第一帧强制 velocity = 0
+                if (transforms.has(entity)) {
+                    auto& transform = transforms.get(entity);
+                    transform.velocity = {0.0f, 0.0f};  // 干脆利落的定身
+                }
+            } else {
+                continue;
+            }
+            
+            // 安全检查
             if (!transforms.has(entity)) {
                 continue;
             }
             
             const auto& transform = transforms.get(entity);
             
-            // 创建 Hitbox 临时实体（只执行一次）
+            // 创建 Hitbox 临时实体
             Entity hitboxEntity = ecs.create();
             
-            // ← 修复关键：transform.position 就是角色位置
-            // bounds 包含 facing 方向的偏移
             hitboxTransforms.add(hitboxEntity, {
-                .position = transform.position,  // ← 使用角色位置
+                .position = transform.position,
                 .scale = {1.0f, 1.0f},
                 .rotation = 0.0f,
                 .velocity = {0.0f, 0.0f}
             });
             
-            // ← 修复关键：bounds 包含 facing 偏移和大小
-            // ← facing 现在是未归一化的方向（如 (1, -1) 表示右上）
             float offsetX = transform.facingX * 50.0f;
             float offsetY = transform.facingY * 50.0f;
             
-            // ← 居中补偿：减去宽高的一半，让 bounds 的 (x,y) 表示中心点偏移
-            // 这样 CollisionSystem 和 renderHitboxes 计算时：
-            // center = position + bounds + size/2
-            //        = position + (offsetX-20, offsetY-20) + (20, 20)
-            //        = position + (offsetX, offsetY)  ← 完美！
             hitboxes.add(hitboxEntity, {
-                .bounds = {offsetX - 20.0f, offsetY - 20.0f, 40, 40},  // ← 居中补偿
+                .bounds = {offsetX - 20.0f, offsetY - 20.0f, 40, 40},
                 .damageMultiplier = 10,
                 .element = ElementType::Physical,
                 .knockbackForce = 100.0f,
@@ -90,8 +103,8 @@ public:
                 .active = true
             });
             
-            // ← 调试输出：攻击信息
-            if (entity == 1) {  // 只输出玩家的攻击
+            // 调试输出
+            if (entity == 1) {
                 float centerX = transform.position.x + offsetX;
                 float centerY = transform.position.y + offsetY;
                 std::cout << "[Attack] Player facing=(" << transform.facingX << ", " << transform.facingY 
@@ -100,12 +113,13 @@ public:
             }
             
             lifetimes.add(hitboxEntity, {
-                .timeLeft = 0.3f,
+                .timeLeft = 0.15f,  // Hitbox 存活 0.15 秒
                 .autoDestroy = true
             });
             
-            // 设置 hitActivated = true，防止重复创建
             attackState.hitActivated = true;
+            
+            std::cout << "[AttackSystem] Attack started! Duration=0.15s\n";
         }
     }
 };
