@@ -393,8 +393,8 @@ int main() {
         if (jumpPressed && zTransforms.has(player)) {
             auto& zComp = zTransforms.get(player);
             if (zComp.isGrounded()) {
-                zComp.jump(400.0f);  // ← 跳跃高度减小 1 倍（从 800 改为 400）
-                std::cout << "[Jump] Player jumped! vz=400\n";
+                zComp.jump(800.0f);  // ← 跳跃高度翻倍（从 400 改为 800）
+                std::cout << "[Jump] Player jumped! vz=800\n";
             }
         }
 
