@@ -95,7 +95,7 @@ auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compo
     transforms.add(player, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, 1.0f, 0.0f});
     characters.add(player, {"Player", 1, 100, 100, 10, 5, 200.0f, false, 0.0f, 1.0f, 0.0f});
     inputs.add(player, {{0.0f, 0.0f}, ActionIntent::None, 0.0f});
-    hurtboxes.add(player, {20.0f, Faction::Player, 1, 0.0f});  // radius=20px
+    hurtboxes.add(player, {20.0f, {0.0f, 0.0f}, Faction::Player, 1, 0.0f});  // radius=20px, offset={0,0}
     evolutions.add(player, {0, 0});
     
     // 赋予玩家冲刺能力
@@ -143,7 +143,7 @@ auto createDummy(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compon
     states.add(dummy, {CharacterState::Idle, CharacterState::Idle, 0.0f});
     transforms.add(dummy, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, -1.0f, 0.0f});
     characters.add(dummy, {"Dummy", 1, 100, 100, 10, 0, 0.0f, false, 0.0f, -1.0f, 0.0f});
-    hurtboxes.add(dummy, {20.0f, Faction::Enemy, 2, 0.0f});  // radius=20px
+    hurtboxes.add(dummy, {20.0f, {0.0f, 0.0f}, Faction::Enemy, 2, 0.0f});  // radius=20px, offset={0,0}
     
     LootDropComponent dummyLoot;
     dummyLoot.lootTable[0] = {1, 1.0f, 1, 1};
@@ -231,9 +231,9 @@ void renderHitboxes(sf::RenderWindow& window, const ComponentStore<TransformComp
         // ← 读取 Z 高度（如果没有则为 0）
         float z = zTransforms.has(entity) ? zTransforms.get(entity).z : 0.0f;
         
-        // ← 【核心视觉偏移】逻辑 Y 减去高度 Z
-        float centerX = transform.position.x;
-        float centerY = transform.position.y - z;
+        // ← 【核心视觉偏移】渲染坐标 = 实体位置 + Hitbox 局部偏移 - Z 高度
+        float centerX = transform.position.x + hitbox.offset.x;
+        float centerY = transform.position.y + hitbox.offset.y - z;
         
         // 渲染圆形 Hitbox
         sf::CircleShape circle(hitbox.radius);

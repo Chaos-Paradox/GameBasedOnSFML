@@ -97,7 +97,8 @@ public:
             });
             
             hitboxes.add(hitboxEntity, {
-                .radius = 20.0f,  // 圆形 Hitbox 半径 20px
+                .radius = 35.0f,  // 圆形 Hitbox 半径 35px（近战攻击）
+                .offset = {offsetX, offsetY},  // 相对于攻击者的偏移
                 .damageMultiplier = 10,
                 .element = ElementType::Physical,
                 .knockbackForce = 100.0f,

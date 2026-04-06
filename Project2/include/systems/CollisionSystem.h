@@ -10,20 +10,18 @@
 #include <iostream>
 
 /**
- * @brief 碰撞检测系统（2.5D 圆柱体判定）
+ * @brief 碰撞检测系统（2.5D 圆柱体判定 - 圆形）
  * 
  * ⚠️ 架构设计：
- * - XY 平面：圆形相交检测（distance < radiusA + radiusB）
+ * - XY 平面：圆形相交检测（distance <= radiusA + radiusB）
  * - Z 轴高度：圆柱体相交检测（bottom/top 重叠）
  * - 只有 XY && Z 同时相交才触发伤害
  * 
- * 职责：
- * - 遍历所有 Hitbox 和 Hurtbox
- * - 2.5D 圆柱体相交检测
- * - 自伤检测（不能伤害自己）
- * - 命中历史检测（防止重复伤害）
- * - 计算伤害浮动（0.8f ~ 1.2f）
- * - 创建 DamageEventComponent 事件实体
+ * 核心算法：
+ * 1. 计算 Hitbox 世界坐标 = attacker.position + hitbox.offset
+ * 2. 计算 Hurtbox 世界坐标 = victim.position + hurtbox.offset
+ * 3. 圆形相交：distance <= (hitbox.radius + hurtbox.radius)
+ * 4. Z 轴相交：!(bottomA > topB || topA < bottomB)
  * 
  * @see DamageEventComponent - 伤害事件载荷
  * @see DamageSystem - 伤害结算系统
@@ -106,14 +104,23 @@ public:
                     victimHeight = zComp.height;
                 }
                 
-                // ========== 3. 条件 A：XY 平面圆相交检测 ==========
-                float dx = hitboxTransform.position.x - targetTransform.position.x;
-                float dy = hitboxTransform.position.y - targetTransform.position.y;
+                // ========== 3. 条件 A：XY 平面圆形相交检测 ==========
+                // 计算 Hitbox 世界坐标 = attacker.position + hitbox.offset
+                float hitboxWorldX = hitboxTransform.position.x + hitbox.offset.x;
+                float hitboxWorldY = hitboxTransform.position.y + hitbox.offset.y;
+                
+                // 计算 Hurtbox 世界坐标 = victim.position + hurtbox.offset
+                float hurtboxWorldX = targetTransform.position.x + hurtbox.offset.x;
+                float hurtboxWorldY = targetTransform.position.y + hurtbox.offset.y;
+                
+                // 计算圆心距离
+                float dx = hitboxWorldX - hurtboxWorldX;
+                float dy = hitboxWorldY - hurtboxWorldY;
                 float distance = std::sqrt(dx * dx + dy * dy);
                 
-                // 圆形相交：distance < (hitbox.radius + hurtbox.radius)
+                // 圆形相交：distance <= (hitbox.radius + hurtbox.radius)
                 float minDistance = hitbox.radius + hurtbox.radius;
-                bool xyIntersect = distance < minDistance;
+                bool xyIntersect = distance <= minDistance;
                 
                 // XY 平面不相交，直接跳过
                 if (!xyIntersect) {
@@ -143,7 +150,8 @@ public:
                 }
                 
                 // ========== 6. 碰撞成立！创建伤害事件 ==========
-                std::cout << "[Collision] ✓ 命中！XY 相交 distance=" << distance 
+                std::cout << "[Collision] ✓ 命中！XY 圆形相交 distance=" << distance 
+                          << " (min=" << minDistance << ")"
                           << " Z 轴相交 attackerZ=" << attackerZ 
                           << " victimZ=" << victimZ << "\n";
                 
@@ -151,9 +159,9 @@ public:
                 HitboxComponent& mutableHitbox = const_cast<HitboxComponent&>(hitbox);
                 addToHitHistory(mutableHitbox, hurtboxEntity);
                 
-                // 计算打击位置（两个实体中心点的中点）
-                float hitX = (hitboxTransform.position.x + targetTransform.position.x) / 2.0f;
-                float hitY = (hitboxTransform.position.y + targetTransform.position.y) / 2.0f;
+                // 计算打击位置（两个圆心的中点）
+                float hitX = (hitboxWorldX + hurtboxWorldX) / 2.0f;
+                float hitY = (hitboxWorldY + hurtboxWorldY) / 2.0f;
                 
                 // 创建伤害事件实体
                 Entity eventEntity = createDamageEvent(
