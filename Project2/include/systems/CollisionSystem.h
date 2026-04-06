@@ -6,22 +6,24 @@
 #include "../components/Transform.h"
 #include "../components/ZTransformComponent.h"
 #include "../components/DamageEventComponent.h"
-#include "../math/Rect.h"
 #include <cstdlib>
 #include <iostream>
 
 /**
- * @brief 碰撞检测系统（掷骰子裁判）
+ * @brief 碰撞检测系统（2.5D 圆柱体判定）
+ * 
+ * ⚠️ 架构设计：
+ * - XY 平面：圆形相交检测（distance < radiusA + radiusB）
+ * - Z 轴高度：圆柱体相交检测（bottom/top 重叠）
+ * - 只有 XY && Z 同时相交才触发伤害
  * 
  * 职责：
  * - 遍历所有 Hitbox 和 Hurtbox
- * - AABB 碰撞检测
+ * - 2.5D 圆柱体相交检测
  * - 自伤检测（不能伤害自己）
  * - 命中历史检测（防止重复伤害）
  * - 计算伤害浮动（0.8f ~ 1.2f）
  * - 创建 DamageEventComponent 事件实体
- * 
- * ⚠️ 关键设计：不再直接挂载 DamageTag，而是创建事件实体
  * 
  * @see DamageEventComponent - 伤害事件载荷
  * @see DamageSystem - 伤害结算系统
@@ -33,9 +35,9 @@ public:
         const ComponentStore<HurtboxComponent>& hurtboxes,
         const ComponentStore<TransformComponent>& hitboxTransforms,
         const ComponentStore<TransformComponent>& targetTransforms,
-        const ComponentStore<ZTransformComponent>& zTransforms,  // ← 新增：Z 轴组件
-        ComponentStore<DamageEventComponent>& damageEvents,  // ← 改为事件实体存储
-        ECS& ecs,  // ← 新增：用于创建事件实体
+        const ComponentStore<ZTransformComponent>& zTransforms,
+        ComponentStore<DamageEventComponent>& damageEvents,
+        ECS& ecs,
         float dt)
     {
         (void)dt;
@@ -54,22 +56,24 @@ public:
             
             const auto& hitboxTransform = hitboxTransforms.get(hitboxEntity);
             
-            // 获取 Hitbox 的 Z 轴数据（如果没有则 z=0, height=0）
+            // ========== 1. 获取 Hitbox 的 Z 轴高度数据 ==========
+            // 如果实体没有 ZTransformComponent，默认 z=0, height=40.0f（默认人高）
             float hitboxZ = 0.0f;
-            float hitboxHeight = 0.0f;
+            float hitboxHeight = 40.0f;  // 默认人高
             if (zTransforms.has(hitboxEntity)) {
                 const auto& zComp = zTransforms.get(hitboxEntity);
                 hitboxZ = zComp.z;
                 hitboxHeight = zComp.height;
             }
             
-            // 计算 Hitbox 的世界坐标（XY 平面）
-            Rect hitboxWorld = {
-                hitboxTransform.position.x + hitbox.bounds.x,
-                hitboxTransform.position.y + hitbox.bounds.y,
-                hitbox.bounds.width,
-                hitbox.bounds.height
-            };
+            // 获取攻击者实体的 Z 轴数据（Hitbox 的发射源）
+            float attackerZ = 0.0f;
+            float attackerHeight = 40.0f;
+            if (hitbox.sourceEntity != INVALID_ENTITY && zTransforms.has(hitbox.sourceEntity)) {
+                const auto& zComp = zTransforms.get(hitbox.sourceEntity);
+                attackerZ = zComp.z;
+                attackerHeight = zComp.height;
+            }
             
             for (Entity hurtboxEntity : hurtboxEntities) {
                 // 不能伤害自己
@@ -92,57 +96,73 @@ public:
                 
                 const auto& targetTransform = targetTransforms.get(hurtboxEntity);
                 
-                // 获取 Hurtbox 的 Z 轴数据（如果没有则 z=0, height=0）
-                float hurtboxZ = 0.0f;
-                float hurtboxHeight = 0.0f;
+                // ========== 2. 获取 Hurtbox 的 Z 轴高度数据 ==========
+                // 如果实体没有 ZTransformComponent，默认 z=0, height=40.0f（默认人高）
+                float victimZ = 0.0f;
+                float victimHeight = 40.0f;  // 默认人高
                 if (zTransforms.has(hurtboxEntity)) {
                     const auto& zComp = zTransforms.get(hurtboxEntity);
-                    hurtboxZ = zComp.z;
-                    hurtboxHeight = zComp.height;
+                    victimZ = zComp.z;
+                    victimHeight = zComp.height;
                 }
                 
-                // 计算 Hurtbox 的世界坐标（XY 平面）
-                Rect hurtboxWorld = {
-                    targetTransform.position.x + hurtbox.bounds.x,
-                    targetTransform.position.y + hurtbox.bounds.y,
-                    hurtbox.bounds.width,
-                    hurtbox.bounds.height
-                };
+                // ========== 3. 条件 A：XY 平面圆相交检测 ==========
+                float dx = hitboxTransform.position.x - targetTransform.position.x;
+                float dy = hitboxTransform.position.y - targetTransform.position.y;
+                float distance = std::sqrt(dx * dx + dy * dy);
                 
-                // AABB 碰撞检测（XY 平面）
-                if (hitboxWorld.overlaps(hurtboxWorld)) {
-                    // ========== 【核心改动】Z 轴豁免判定 ==========
-                    // 影子重叠了！这时候再看 Z 轴高度
-                    float hitboxBottom = hitboxZ;
-                    float hitboxTop = hitboxZ + hitboxHeight;
-                    float hurtboxBottom = hurtboxZ;
-                    float hurtboxTop = hurtboxZ + hurtboxHeight;
-                    
-                    // 如果 Z 轴没有交集，说明一个在空中一个在地上，豁免碰撞
-                    // 逻辑：!(aBottom > bTop || aTop < bBottom) = Z 轴有交集
-                    bool zAxisOverlap = !(hitboxBottom > hurtboxTop || hitboxTop < hurtboxBottom);
-                    
-                    if (!zAxisOverlap) {
-                        // Z 轴豁免：虽然 XY 重叠，但高度不同，不会受伤
-                        std::cout << "[Collision] Z-axis豁免：hitboxZ=" << hitboxZ 
-                                  << " hurtboxZ=" << hurtboxZ << "\n";
-                        continue;
-                    }
-                    // ========== Z 轴判定结束 ==========
-                    
-                    // 添加到命中历史
-                    HitboxComponent& mutableHitbox = const_cast<HitboxComponent&>(hitbox);
-                    addToHitHistory(mutableHitbox, hurtboxEntity);
-                    
-                    // 计算伤害浮动并创建事件实体
-                    Entity eventEntity = createDamageEvent(
-                        ecs, damageEvents,
-                        hitbox, hurtboxEntity, hitbox.sourceEntity,
-                        hitboxWorld, hurtboxWorld
-                    );
-                    
-                    (void)eventEntity;  // 事件实体已创建，由 DamageSystem 处理
+                // 圆形相交：distance < (hitbox.radius + hurtbox.radius)
+                float minDistance = hitbox.radius + hurtbox.radius;
+                bool xyIntersect = distance < minDistance;
+                
+                // XY 平面不相交，直接跳过
+                if (!xyIntersect) {
+                    continue;
                 }
+                
+                // ========== 4. 条件 B：Z 轴高度相交检测 ==========
+                // 使用攻击者（sourceEntity）的 Z 轴数据，而不是 Hitbox 实体的
+                float attackerBottom = attackerZ;
+                float attackerTop = attackerZ + attackerHeight;
+                
+                float victimBottom = victimZ;
+                float victimTop = victimZ + victimHeight;
+                
+                // Z 轴重叠判定：A 的底部低于 B 的顶部，且 A 的顶部高于 B 的底部
+                // 逻辑：!(attackerBottom > victimTop || attackerTop < victimBottom)
+                bool zIntersect = !(attackerBottom > victimTop || attackerTop < victimBottom);
+                
+                // ========== 5. 最终判定：XY && Z 同时相交 ==========
+                if (!zIntersect) {
+                    // Z 轴豁免：虽然 XY 重叠，但高度不同（例如跳跃躲避）
+                    std::cout << "[Collision] Z-axis 豁免！attackerZ=" << attackerZ 
+                              << " victimZ=" << victimZ 
+                              << " (attackerTop=" << attackerTop 
+                              << ", victimBottom=" << victimBottom << ")\n";
+                    continue;
+                }
+                
+                // ========== 6. 碰撞成立！创建伤害事件 ==========
+                std::cout << "[Collision] ✓ 命中！XY 相交 distance=" << distance 
+                          << " Z 轴相交 attackerZ=" << attackerZ 
+                          << " victimZ=" << victimZ << "\n";
+                
+                // 添加到命中历史
+                HitboxComponent& mutableHitbox = const_cast<HitboxComponent&>(hitbox);
+                addToHitHistory(mutableHitbox, hurtboxEntity);
+                
+                // 计算打击位置（两个实体中心点的中点）
+                float hitX = (hitboxTransform.position.x + targetTransform.position.x) / 2.0f;
+                float hitY = (hitboxTransform.position.y + targetTransform.position.y) / 2.0f;
+                
+                // 创建伤害事件实体
+                Entity eventEntity = createDamageEvent(
+                    ecs, damageEvents,
+                    hitbox, hurtboxEntity, hitbox.sourceEntity,
+                    hitX, hitY
+                );
+                
+                (void)eventEntity;  // 事件实体已创建，由 DamageSystem 处理
             }
         }
     }
@@ -156,8 +176,8 @@ private:
      * @param hitbox 命中的 Hitbox
      * @param target 受击者实体 ID
      * @param attacker 攻击者实体 ID
-     * @param hitboxWorld Hitbox 世界坐标
-     * @param hurtboxWorld Hurtbox 世界坐标
+     * @param hitX 打击位置 X
+     * @param hitY 打击位置 Y
      * @return 事件实体 ID
      */
     Entity createDamageEvent(
@@ -166,25 +186,18 @@ private:
         const HitboxComponent& hitbox,
         Entity target,
         Entity attacker,
-        const Rect& hitboxWorld,
-        const Rect& hurtboxWorld)
+        float hitX, float hitY)
     {
         Entity eventEntity = ecs.create();
         
-        // ← 【核心改动】计算伤害浮动（0.8f ~ 1.2f）
+        // 计算伤害浮动（0.8f ~ 1.2f）
         float randomMultiplier = 0.8f + (static_cast<float>(std::rand()) / RAND_MAX) * 0.4f;
         
-        // ← 【核心改动】判定暴击（浮动倍率 > 1.1f）
+        // 判定暴击（浮动倍率 > 1.1f）
         bool isCritical = (randomMultiplier > 1.1f);
         
-        // ← 【核心改动】计算最终伤害
+        // 计算最终伤害
         int actualDamage = static_cast<int>(hitbox.damageMultiplier * randomMultiplier);
-        
-        // ← 【核心改动】计算打击位置（两个碰撞框的中心点）
-        float hitX = (hitboxWorld.x + hitboxWorld.width / 2.0f + 
-                      hurtboxWorld.x + hurtboxWorld.width / 2.0f) / 2.0f;
-        float hitY = (hitboxWorld.y + hitboxWorld.height / 2.0f + 
-                      hurtboxWorld.y + hurtboxWorld.height / 2.0f) / 2.0f;
         
         // 挂载 DamageEventComponent
         damageEvents.add(eventEntity, {
@@ -196,7 +209,7 @@ private:
             .timestamp = 0.0f  // 由主循环设置
         });
         
-        std::cout << "[Collision] Created damage event: target=" << target 
+        std::cout << "[Collision] 伤害事件：target=" << target 
                   << " damage=" << actualDamage 
                   << " (multiplier=" << randomMultiplier 
                   << ", crit=" << (isCritical ? "YES" : "NO") << ")\n";

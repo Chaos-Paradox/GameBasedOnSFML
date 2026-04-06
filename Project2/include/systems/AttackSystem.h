@@ -93,7 +93,7 @@ public:
             float offsetY = transform.facingY * 50.0f;
             
             hitboxes.add(hitboxEntity, {
-                .bounds = {offsetX - 20.0f, offsetY - 20.0f, 40, 40},
+                .radius = 20.0f,  // 圆形 Hitbox 半径 20px
                 .damageMultiplier = 10,
                 .element = ElementType::Physical,
                 .knockbackForce = 100.0f,
@@ -102,6 +102,11 @@ public:
                 .hitCount = 0,
                 .active = true
             });
+            
+            // 设置 Hitbox 位置（圆形不需要 bounds，直接用 position + offset）
+            auto& hitboxTrans = hitboxTransforms.get(hitboxEntity);
+            hitboxTrans.position.x += offsetX;
+            hitboxTrans.position.y += offsetY;
             
             // 调试输出
             if (entity == 1) {

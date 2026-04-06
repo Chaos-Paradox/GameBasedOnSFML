@@ -93,7 +93,7 @@ auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compo
     transforms.add(player, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, 1.0f, 0.0f});
     characters.add(player, {"Player", 1, 100, 100, 10, 5, 200.0f, false, 0.0f, 1.0f, 0.0f});
     inputs.add(player, {{0.0f, 0.0f}, ActionIntent::None, 0.0f});
-    hurtboxes.add(player, {{-20, -20, 40, 40}, Faction::Player, 1, 0.0f});
+    hurtboxes.add(player, {20.0f, Faction::Player, 1, 0.0f});  // radius=20px
     evolutions.add(player, {0, 0});
     
     // 赋予玩家冲刺能力
@@ -141,7 +141,7 @@ auto createDummy(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compon
     states.add(dummy, {CharacterState::Idle, CharacterState::Idle, 0.0f});
     transforms.add(dummy, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, -1.0f, 0.0f});
     characters.add(dummy, {"Dummy", 1, 100, 100, 10, 0, 0.0f, false, 0.0f, -1.0f, 0.0f});
-    hurtboxes.add(dummy, {{-20, -20, 40, 40}, Faction::Enemy, 2, 0.0f});
+    hurtboxes.add(dummy, {20.0f, Faction::Enemy, 2, 0.0f});  // radius=20px
     
     LootDropComponent dummyLoot;
     dummyLoot.lootTable[0] = {1, 1.0f, 1, 1};
@@ -224,13 +224,13 @@ void renderHitboxes(sf::RenderWindow& window, const ComponentStore<TransformComp
         if (!transforms.has(entity)) continue;
         const auto& transform = transforms.get(entity);
         const auto& hitbox = hitboxes.get(entity);
-        float centerX = transform.position.x + hitbox.bounds.x + hitbox.bounds.width / 2.0f;
-        float centerY = transform.position.y + hitbox.bounds.y + hitbox.bounds.height / 2.0f;
-        sf::RectangleShape rect({hitbox.bounds.width, hitbox.bounds.height});
-        rect.setOrigin({hitbox.bounds.width / 2.0f, hitbox.bounds.height / 2.0f});
-        rect.setPosition({centerX, centerY});
-        rect.setFillColor(COLOR_HITBOX);
-        window.draw(rect);
+        
+        // 渲染圆形 Hitbox
+        sf::CircleShape circle(hitbox.radius);
+        circle.setOrigin({hitbox.radius, hitbox.radius});
+        circle.setPosition({transform.position.x, transform.position.y});
+        circle.setFillColor(COLOR_HITBOX);
+        window.draw(circle);
     }
 }
 
