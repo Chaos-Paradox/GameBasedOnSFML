@@ -1,7 +1,7 @@
 # 00_ARCHITECTURE.md - Project2 架构地图
 
 > **多人共斗游戏核心架构，与渲染解耦**  
-> **版本:** 3.0（完整战斗系统） | **最后更新:** 2026-04-06
+> **版本:** 3.1（单轨覆盖指令槽） | **最后更新:** 2026-04-06
 
 ---
 
@@ -288,6 +288,79 @@ namespace Math {
 | `TransformComponent` | `Vec2 position, scale, velocity`<br>`float rotation` | 位置、旋转、速度 |
 | `StateMachineComponent` | `CharacterState currentState`<br>`CharacterState previousState`<br>`float stateTimer` | 状态机数据 |
 | `CharacterComponent` | `int level, maxHP, currentHP`<br>`int baseAttack, baseDefense`<br>`float baseMoveSpeed` | 角色属性 |
+| `InputCommand` | `Vec2 moveDir`<br>`ActionIntent pendingIntent`<br>`float intentTimer` | **单轨指令槽**（v3.1） |
+
+---
+
+## 🎮 输入系统架构（v3.1 单轨覆盖指令槽）
+
+### 设计动机
+
+**问题：** 传统多 Timer 独立缓存在长硬直场景下会失效
+
+```
+场景：玩家被击中，进入 1.0 秒 Hurt 硬直
+- 第 0.5 秒：玩家按下冲刺键
+- 第 0.7 秒：0.2 秒保质期耗尽，指令过期
+- 第 1.0 秒：硬直结束，角色呆立原地（玩家大骂！）
+```
+
+### 解决方案：单轨覆盖 + 时间静止魔法
+
+**核心原则：**
+
+1. **单一意图槽** - `ActionIntent pendingIntent` 代替多个独立 Timer
+2. **Last-In-Wins** - 新指令无条件覆盖旧指令，重置保质期
+3. **时间静止** - Hurt/Dead/Dash 期间 `intentTimer` 暂停倒计时
+
+**架构蓝图：**
+
+```cpp
+enum class ActionIntent {
+    None,
+    Attack,
+    Dash
+};
+
+struct InputCommand {
+    Vec2 moveDir{0.0f, 0.0f};
+    ActionIntent pendingIntent{ActionIntent::None};  // ← 单一意图槽
+    float intentTimer{0.0f};                         // ← 统一保质期
+};
+```
+
+**输入录入（VisualSandbox.cpp）：**
+
+```cpp
+// Last-In-Wins：新指令覆盖旧指令
+if (currentJPressed && !lastJPressed) {
+    inputs.get(player).pendingIntent = ActionIntent::Attack;
+    inputs.get(player).intentTimer = 0.2f;
+}
+if (currentSpacePressed && !lastSpacePressed) {
+    inputs.get(player).pendingIntent = ActionIntent::Dash;  // ← 覆盖攻击
+    inputs.get(player).intentTimer = 0.2f;                  // ← 重置保质期
+}
+```
+
+**时间静止魔法（StateMachineSystem）：**
+
+```cpp
+if (input.intentTimer > 0.0f) {
+    // 只在可行动状态下倒计时
+    if (state.currentState != CharacterState::Hurt &&
+        state.currentState != CharacterState::Dead &&
+        state.currentState != CharacterState::Dash) {
+        input.intentTimer -= dt;
+    }
+}
+```
+
+**效果：**
+
+- ✅ 硬直期间按下的指令永远保鲜，直到硬直结束
+- ✅ 同时按 J+Space 以最后按下的为准，无逻辑死锁
+- ✅ 精准消费：只在成功切入状态时清零意图
 
 ### 战斗 Component
 

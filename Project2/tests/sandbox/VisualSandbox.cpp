@@ -86,7 +86,7 @@ auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compo
     states.add(player, {CharacterState::Idle, CharacterState::Idle, 0.0f});
     transforms.add(player, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, 1.0f, 0.0f});
     characters.add(player, {"Player", 1, 100, 100, 10, 5, 200.0f, false, 0.0f, 1.0f, 0.0f});
-    inputs.add(player, {{0.0f, 0.0f}, false});
+    inputs.add(player, {{0.0f, 0.0f}, ActionIntent::None, 0.0f});
     hurtboxes.add(player, {{-20, -20, 40, 40}, Faction::Player, 1, 0.0f});
     evolutions.add(player, {0, 0});
     
@@ -273,7 +273,6 @@ int main() {
     // 输入缓存变量
     bool lastJPressed = false;
     bool lastSpacePressed = false;
-    bool dashPressedSignal = false;
     
     while (window.isOpen()) {
         sf::Time dtTime = clock.restart();
@@ -310,16 +309,22 @@ int main() {
         // --- 循环外：抓取瞬时输入 ---
         inputs.get(player).moveDir = getInputFromKeyboard();
         
-        // ← 【核心修复】限时输入缓存：按键按下时赋予 0.2 秒保质期
+        // ← 【工业级】单轨覆盖指令槽：Last-In-Wins 原则
+        // 核心设计：新指令无条件覆盖旧指令，并重置 0.2 秒保质期
+        // 这样即使同时按 J+Space，也会以最后按下的为准，避免逻辑死锁
         bool currentJPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::J);
         if (currentJPressed && !lastJPressed) {
-            inputs.get(player).attackBufferTimer = 0.2f;  // 0.2 秒保质期
+            inputs.get(player).pendingIntent = ActionIntent::Attack;
+            inputs.get(player).intentTimer = 0.2f;  // 0.2 秒保质期
         }
         lastJPressed = currentJPressed;
 
         bool currentSpacePressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
         if (currentSpacePressed && !lastSpacePressed) {
-            dashPressedSignal = true; // 缓存冲刺信号，直到被物理循环消费
+            // ← 冲刺指令覆盖攻击指令（Last-In-Wins）
+            inputs.get(player).pendingIntent = ActionIntent::Dash;
+            inputs.get(player).intentTimer = 0.2f;  // 重置保质期
+            // 注意：DashSystem 直接从 inputs 读取意图，不需要额外信号
         }
         lastSpacePressed = currentSpacePressed;
 
@@ -338,9 +343,8 @@ int main() {
             // 严格按照时序执行管线！
             stateSystem.update(states, attackStates, inputs, damageEvents, ecs, fixedDt);
             
-            // 冲刺系统吃掉输入信号，并赋予极高初速度
-            dashSystem.update(dashes, states, transforms, dashPressedSignal, fixedDt);
-            dashPressedSignal = false; // 消费完毕
+            // 冲刺系统从单轨指令槽读取 Dash 意图
+            dashSystem.update(dashes, states, transforms, inputs, fixedDt);
             
             // 基础移动（内部有 if(state == Dash) return 保护）
             locomotionSystem.update(states, transforms, characters, inputs, fixedDt);

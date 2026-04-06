@@ -4,6 +4,7 @@
 #include "../components/DashComponent.h"
 #include "../components/StateMachine.h"
 #include "../components/Transform.h"
+#include "../components/InputCommand.h"
 #include <cmath>
 #include <iostream>
 
@@ -11,7 +12,7 @@
  * @brief 冲刺系统
  * 
  * ⚠️ 关键设计：初速度只在切入 Dash 状态的那一帧设置！
- * ⚠️ Fixed Timestep 适配：dashPressed 在循环外检测，避免多次触发
+ * ⚠️ 单轨指令槽适配：从 InputCommand 读取 pendingIntent
  */
 class DashSystem {
 public:
@@ -19,7 +20,7 @@ public:
         ComponentStore<DashComponent>& dashes,
         ComponentStore<StateMachineComponent>& states,
         ComponentStore<TransformComponent>& transforms,
-        bool dashPressed,  // ← 冲刺按键标志（在循环外检测，只触发一次）
+        ComponentStore<InputCommand>& inputs,
         float dt)
     {
         auto dashEntities = dashes.entityList();
@@ -37,8 +38,12 @@ public:
                 state.currentState != CharacterState::Hurt &&
                 state.currentState != CharacterState::Dead) {
                 
-                // ← 使用传入的 dashPressed 标志（只触发一次）
-                if (dashPressed && dash.cooldownTimer <= 0.0f) {
+                // ← 从单轨指令槽读取 Dash 意图（Last-In-Wins）
+                bool hasDashIntent = inputs.has(entity) && 
+                                     inputs.get(entity).pendingIntent == ActionIntent::Dash &&
+                                     inputs.get(entity).intentTimer > 0.0f;
+                
+                if (hasDashIntent && dash.cooldownTimer <= 0.0f) {
                     // 获取 facing 方向
                     if (transform.facingX != 0.0f || transform.facingY != 0.0f) {
                         float length = std::sqrt(transform.facingX * transform.facingX + 
@@ -65,6 +70,12 @@ public:
                     dash.iframeTimer = dash.iframeDuration;
                     dash.isInvincible = true;
                     dash.cooldownTimer = dash.cooldown;
+                    
+                    // ← 精准消费：清零 Dash 意图
+                    if (inputs.has(entity)) {
+                        inputs.get(entity).pendingIntent = ActionIntent::None;
+                        inputs.get(entity).intentTimer = 0.0f;
+                    }
                     
                     std::cout << "[DashSystem] ✓ DASH! velocity=2000 dir=(" 
                               << dash.dashDir.x << ", " << dash.dashDir.y << ")\n";
