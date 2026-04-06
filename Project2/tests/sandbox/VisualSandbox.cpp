@@ -446,9 +446,32 @@ int main() {
             const auto& playerTrans = transforms.get(player);
             const auto& playerZ = zTransforms.get(player);
             
-            // 位置在玩家面前 10 像素处
-            float offsetX = playerTrans.facingX * 10.0f;
-            float offsetY = playerTrans.facingY * 10.0f;
+            // ← 【修复】获取朝向（如果 facing 为 0，使用移动方向或默认向右）
+            float facingX = playerTrans.facingX;
+            float facingY = playerTrans.facingY;
+            
+            if (facingX == 0.0f && facingY == 0.0f) {
+                // 使用移动方向
+                const auto& input = inputs.get(player);
+                if (input.moveDir.x != 0.0f || input.moveDir.y != 0.0f) {
+                    facingX = input.moveDir.x;
+                    facingY = input.moveDir.y;
+                    // 归一化
+                    float len = std::sqrt(facingX * facingX + facingY * facingY);
+                    if (len > 0.0f) {
+                        facingX /= len;
+                        facingY /= len;
+                    }
+                } else {
+                    // 默认向右
+                    facingX = 1.0f;
+                    facingY = 0.0f;
+                }
+            }
+            
+            // ← 【修复】生成位置在玩家面前 35 像素处（避免物理粘连）
+            float offsetX = facingX * 35.0f;
+            float offsetY = facingY * 35.0f;
             
             transforms.add(bomb, {
                 .position = {playerTrans.position.x + offsetX, playerTrans.position.y + offsetY},
@@ -470,13 +493,15 @@ int main() {
                 .height = 30.0f      // 炸弹物理高度
             });
             
-            // 添加碰撞器（可被踢飞）
+            // ← 【修复】添加物理碰撞体（半径 12px，可被推开）
             colliders.add(bomb, {
-                .radius = 15.0f,     // 炸弹碰撞半径
+                .radius = 12.0f,     // 炸弹碰撞半径
                 .isStatic = false
             });
             
-            std::cout << "[Bomb] 丢出炸弹！fuse=3.0s\n";
+            std::cout << "[Bomb] 丢出炸弹！fuse=3.0s pos=(" 
+                      << (playerTrans.position.x + offsetX) << ", "
+                      << (playerTrans.position.y + offsetY) << ")\n";
         }
         lastBombPressed = bombPressed;
 
