@@ -8,6 +8,7 @@
 #include "../components/Character.h"
 #include "../components/Hitbox.h"
 #include "../components/Lifetime.h"
+#include "../components/DeathTag.h"
 #include <cmath>
 #include <iostream>
 
@@ -19,8 +20,10 @@
  * - 原地弹跳物理（依赖 ZTransformComponent）
  * - Dash 碰撞踢飞（动量传递）
  * - 爆炸 AOE 生成
+ * - DeathTag 延迟销毁（防止崩溃）
  * 
  * @see BombComponent - 炸弹组件
+ * @see DeathTag - 死亡标记
  */
 class BombSystem {
 public:
@@ -33,12 +36,16 @@ public:
         ComponentStore<HitboxComponent>& hitboxes,
         ComponentStore<LifetimeComponent>& lifetimes,
         ComponentStore<TransformComponent>& hitboxTransforms,
+        ComponentStore<DeathTag>& deathTags,  // ← 新增：DeathTag
         ECS& ecs,
         float dt)
     {
         auto bombEntities = bombs.entityList();
         
         for (Entity bomb : bombEntities) {
+            // ========== 0. 状态保护：已销毁的实体跳过 ==========
+            if (deathTags.has(bomb)) continue;
+            
             if (!bombs.has(bomb) || !transforms.has(bomb) || !zTransforms.has(bomb)) {
                 continue;
             }
@@ -50,9 +57,12 @@ public:
             // ========== 1. 引信倒计时 ==========
             bombComp.fuseTimer -= dt;
             
-            // ========== 2. 爆炸生成 AOE ==========
+            // ========== 2. 爆炸生成 AOE（原子化操作） ==========
             if (bombComp.fuseTimer <= 0.0f) {
                 std::cout << "[Bomb] 💥 炸弹爆炸！\n";
+                
+                // ← 【核心修复】第一时间标记 DeathTag，防止重复引爆
+                deathTags.add(bomb, {});
                 
                 // 生成爆炸 Hitbox（巨大圆形 AOE）
                 Entity explosion = ecs.create();
@@ -90,9 +100,11 @@ public:
                     .autoDestroy = true
                 });
                 
-                // 销毁炸弹实体
-                ecs.destroy(bomb);
-                continue;
+                // ← 【核心修复】不再直接 ecs.destroy，而是依赖 CleanupSystem
+                // ecs.destroy(bomb);  ❌ 错误！会导致崩溃
+                // continue;  // 也不需要了，因为 DeathTag 会在下一帧跳过
+                
+                continue;  // 跳过后续逻辑
             }
             
             // ========== 3. 原地弹跳物理 ==========

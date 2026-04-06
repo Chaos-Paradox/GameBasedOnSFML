@@ -34,6 +34,7 @@
 #include "components/ColliderComponent.h"
 #include "components/AttachedComponent.h"
 #include "components/BombComponent.h"
+#include "components/DeathTag.h"
 
 #include "systems/StateMachineSystem.h"
 #include "systems/LocomotionSystem.h"
@@ -51,6 +52,7 @@
 #include "systems/PhysicalCollisionSystem.h"
 #include "systems/AttachmentSystem.h"
 #include "systems/BombSystem.h"
+#include "systems/CleanupSystem.h"
 
 constexpr int WINDOW_WIDTH = 1024;
 constexpr int WINDOW_HEIGHT = 768;
@@ -548,15 +550,17 @@ int main() {
             collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, zTransforms, damageEvents, ecs, fixedDt);
             
             // ← 新增：炸弹系统（倒计时、弹跳、踢飞、爆炸）
-            bombSystem.update(bombs, transforms, zTransforms, states, characters, hitboxes, lifetimes, transforms, ecs, fixedDt);
+            bombSystem.update(bombs, transforms, zTransforms, states, characters, hitboxes, lifetimes, transforms, deathTags, ecs, fixedDt);
             damageSystem.update(characters, damageEvents, deathTags, states, dashes);
             
             lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
             deathSystem.update(states, transforms, characters, hurtboxes, lootDrops, inputs, deathTags, ecs, fixedDt);
             
             pickupSystem.update(ecs, evolutions, transforms, transforms, itemDatas, pickupBoxes, magnets);
-            cleanupSystem.update(lifetimes, transforms, hitboxes, magnets, itemDatas, pickupBoxes, damageEvents, ecs, fixedDt);
         }
+        
+        // ← 【核心改动】清理系统（在渲染之后，帧末执行）
+        cleanupSystem.update(ecs, deathTags, lifetimes, TIME_PER_FRAME.asSeconds());
         
         // --- 循环外：纯渲染 ---
         window.clear(COLOR_BACKGROUND);

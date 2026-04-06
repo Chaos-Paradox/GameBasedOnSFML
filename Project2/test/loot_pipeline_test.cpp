@@ -87,7 +87,7 @@ TEST_F(LootPipelineTest, MonsterDeath_SpawnsLoot) {
     characters.get(monster).currentHP = 0;
     
     // 3. 挂载 DeathTag
-    deathTags.add(monster, {0.0f});
+    deathTags.add(monster, {});
     
     // 4. 运行 LootSpawnSystem（生成掉落物）
     lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
@@ -248,8 +248,8 @@ TEST_F(LootPipelineTest, DropChance_ProbabilityTest) {
     lootDrops.add(monsterFullDrop, fullDropLoot);
     
     // 3. 挂载 DeathTag
-    deathTags.add(monsterNoDrop, {0.0f});
-    deathTags.add(monsterFullDrop, {0.0f});
+    deathTags.add(monsterNoDrop, {});
+    deathTags.add(monsterFullDrop, {});
     
     // 4. 运行 LootSpawnSystem
     lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);

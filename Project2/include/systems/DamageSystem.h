@@ -56,7 +56,7 @@ public:
                     
                     // ← 【关键】贴上 DeathTag（死亡通知单）
                     if (!deathTags.has(event.target)) {
-                        deathTags.add(event.target, {0.0f});
+                        deathTags.add(event.target, {});
                         std::cout << "[DamageSystem] DeathTag added to Entity " << event.target << "\n";
                     }
                 }
