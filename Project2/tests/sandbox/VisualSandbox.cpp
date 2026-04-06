@@ -32,6 +32,7 @@
 #include "components/DamageEventComponent.h"
 #include "components/ZTransformComponent.h"
 #include "components/ColliderComponent.h"
+#include "components/AttachedComponent.h"
 
 #include "systems/StateMachineSystem.h"
 #include "systems/LocomotionSystem.h"
@@ -47,6 +48,7 @@
 #include "systems/DebugSystem.h"
 #include "systems/DashSystem.h"
 #include "systems/PhysicalCollisionSystem.h"
+#include "systems/AttachmentSystem.h"
 
 constexpr int WINDOW_WIDTH = 1024;
 constexpr int WINDOW_HEIGHT = 768;
@@ -163,9 +165,9 @@ void renderEntity(sf::RenderWindow& window, const TransformComponent& trans, con
                   const StateMachineComponent& state, bool isPlayer, const DashComponent* dash = nullptr,
                   const ZTransformComponent* zComp = nullptr) {
     // ← 【2.5D 通用影子】永远绘制在逻辑坐标上
-    sf::CircleShape shadow(15.0f);
-    shadow.setOrigin({15.0f, 7.5f});        // 中心点偏移
-    shadow.setScale({1.0f, 0.5f});          // 压扁成 2.5D 椭圆形
+    sf::CircleShape shadow(30.0f);        // ← 影子大一倍（从 15 改为 30）
+    shadow.setOrigin({30.0f, 15.0f});     // 中心点偏移
+    shadow.setScale({1.0f, 0.5f});        // 压扁成 2.5D 椭圆形
     shadow.setFillColor(sf::Color(0, 0, 0, 100));  // 半透明黑色
     shadow.setPosition({trans.position.x, trans.position.y});
     window.draw(shadow);
@@ -219,17 +221,25 @@ void renderEntity(sf::RenderWindow& window, const TransformComponent& trans, con
 }
 
 void renderHitboxes(sf::RenderWindow& window, const ComponentStore<TransformComponent>& transforms,
-                    const ComponentStore<HitboxComponent>& hitboxes) {
+                    const ComponentStore<HitboxComponent>& hitboxes,
+                    const ComponentStore<ZTransformComponent>& zTransforms) {  // ← 新增参数
     for (Entity entity : hitboxes.entityList()) {
         if (!transforms.has(entity)) continue;
         const auto& transform = transforms.get(entity);
         const auto& hitbox = hitboxes.get(entity);
         
+        // ← 读取 Z 高度（如果没有则为 0）
+        float z = zTransforms.has(entity) ? zTransforms.get(entity).z : 0.0f;
+        
+        // ← 【核心视觉偏移】逻辑 Y 减去高度 Z
+        float centerX = transform.position.x;
+        float centerY = transform.position.y - z;
+        
         // 渲染圆形 Hitbox
         sf::CircleShape circle(hitbox.radius);
         circle.setOrigin({hitbox.radius, hitbox.radius});
-        circle.setPosition({transform.position.x, transform.position.y});
-        circle.setFillColor(COLOR_HITBOX);
+        circle.setPosition({centerX, centerY});
+        circle.setFillColor(sf::Color(255, 255, 0, 128));  // 半透明黄色
         window.draw(circle);
     }
 }
@@ -293,6 +303,7 @@ int main() {
     ComponentStore<DashComponent> dashes;
     ComponentStore<ZTransformComponent> zTransforms;  // ← 新增：Z 轴组件
     ComponentStore<ColliderComponent> colliders;  // ← 新增：圆柱体碰撞器
+    ComponentStore<AttachedComponent> attachedComponents;  // ← 新增：依附组件
 
     // System 初始化
     StateMachineSystem stateSystem;
@@ -309,6 +320,7 @@ int main() {
     DebugSystem debugSystem;
     DashSystem dashSystem;
     PhysicalCollisionSystem physicalCollisionSystem;  // ← 新增：物理碰撞系统
+    AttachmentSystem attachmentSystem;  // ← 新增：依附同步系统
 
     auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, dashes, magnets, zTransforms, colliders, 200, 300);
     auto dummy = createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, colliders, 700, 300);
@@ -381,8 +393,8 @@ int main() {
         if (jumpPressed && zTransforms.has(player)) {
             auto& zComp = zTransforms.get(player);
             if (zComp.isGrounded()) {
-                zComp.jump(800.0f);  // 跳跃初速度 800 像素/秒
-                std::cout << "[Jump] Player jumped! vz=800\n";
+                zComp.jump(400.0f);  // ← 跳跃高度减小 1 倍（从 800 改为 400）
+                std::cout << "[Jump] Player jumped! vz=400\n";
             }
         }
 
@@ -422,7 +434,10 @@ int main() {
             // ← 新增：物理碰撞系统（圆柱体排斥，在 Movement 之后，战斗碰撞之前）
             physicalCollisionSystem.update(colliders, transforms, fixedDt);
             
-            attackSystem.update(states, attackStates, transforms, characters, ecs, transforms, hitboxes, lifetimes, fixedDt);
+            // ← 新增：依附同步系统（同步 Hitbox 到主人）
+            attachmentSystem.update(attachedComponents, transforms, zTransforms, fixedDt);
+            
+            attackSystem.update(states, attackStates, transforms, characters, ecs, transforms, hitboxes, lifetimes, attachedComponents, zTransforms, fixedDt);
             collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, zTransforms, damageEvents, ecs, fixedDt);
             damageSystem.update(characters, damageEvents, deathTags, states, dashes);
             
@@ -462,7 +477,7 @@ int main() {
             renderEntity(window, transforms.get(entity), characters.get(entity), states.get(entity), isPlayer, dashPtr, zPtr);
         }
         
-        renderHitboxes(window, transforms, hitboxes);
+        renderHitboxes(window, transforms, hitboxes, zTransforms);
         renderLoot(window, transforms, itemDatas);
         window.display();
         

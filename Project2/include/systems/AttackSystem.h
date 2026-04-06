@@ -8,6 +8,8 @@
 #include "../components/Hitbox.h"
 #include "../components/Lifetime.h"
 #include "../components/AttackState.h"
+#include "../components/AttachedComponent.h"
+#include "../components/ZTransformComponent.h"
 
 /**
  * @brief 攻击判定系统
@@ -28,6 +30,8 @@ public:
         ComponentStore<TransformComponent>& hitboxTransforms,
         ComponentStore<HitboxComponent>& hitboxes,
         ComponentStore<LifetimeComponent>& lifetimes,
+        ComponentStore<AttachedComponent>& attachedComponents,
+        ComponentStore<ZTransformComponent>& zTransforms,
         float dt)
     {
         (void)characters;
@@ -82,15 +86,15 @@ public:
             // 创建 Hitbox 临时实体
             Entity hitboxEntity = ecs.create();
             
+            float offsetX = transform.facingX * 50.0f;
+            float offsetY = transform.facingY * 50.0f;
+            
             hitboxTransforms.add(hitboxEntity, {
-                .position = transform.position,
+                .position = {transform.position.x + offsetX, transform.position.y + offsetY},
                 .scale = {1.0f, 1.0f},
                 .rotation = 0.0f,
                 .velocity = {0.0f, 0.0f}
             });
-            
-            float offsetX = transform.facingX * 50.0f;
-            float offsetY = transform.facingY * 50.0f;
             
             hitboxes.add(hitboxEntity, {
                 .radius = 20.0f,  // 圆形 Hitbox 半径 20px
@@ -103,10 +107,22 @@ public:
                 .active = true
             });
             
-            // 设置 Hitbox 位置（圆形不需要 bounds，直接用 position + offset）
-            auto& hitboxTrans = hitboxTransforms.get(hitboxEntity);
-            hitboxTrans.position.x += offsetX;
-            hitboxTrans.position.y += offsetY;
+            // ← 【核心改动】挂载依附组件（同步 XY 位置）
+            attachedComponents.add(hitboxEntity, {
+                .owner = entity,
+                .offset = {offsetX, offsetY}
+            });
+            
+            // ← 【核心改动】同步 Z 轴高度（直接拷贝攻击者的 ZTransform）
+            if (zTransforms.has(entity)) {
+                const auto& ownerZ = zTransforms.get(entity);
+                zTransforms.add(hitboxEntity, {
+                    .z = ownerZ.z,
+                    .vz = 0.0f,  // Hitbox 不受重力影响
+                    .gravity = 0.0f,
+                    .height = ownerZ.height  // 与攻击者相同高度
+                });
+            }
             
             // 调试输出
             if (entity == 1) {
