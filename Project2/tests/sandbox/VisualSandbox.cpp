@@ -560,7 +560,13 @@ int main() {
         }
         
         // ← 【核心改动】清理系统（在渲染之后，帧末执行）
-        cleanupSystem.update(ecs, deathTags, lifetimes, TIME_PER_FRAME.asSeconds());
+        cleanupSystem.update(ecs, deathTags, lifetimes,
+            states, transforms, characters, inputs, hurtboxes,
+            hitboxes, attackStates, damageTags,
+            lootDrops, itemDatas, pickupBoxes,
+            magnets, evolutions, dashes,
+            bombs, attachedComponents, colliders,
+            TIME_PER_FRAME.asSeconds());
         
         // --- 循环外：纯渲染 ---
         window.clear(COLOR_BACKGROUND);
