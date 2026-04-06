@@ -33,6 +33,7 @@
 #include "components/ZTransformComponent.h"
 #include "components/ColliderComponent.h"
 #include "components/AttachedComponent.h"
+#include "components/BombComponent.h"
 
 #include "systems/StateMachineSystem.h"
 #include "systems/LocomotionSystem.h"
@@ -49,6 +50,7 @@
 #include "systems/DashSystem.h"
 #include "systems/PhysicalCollisionSystem.h"
 #include "systems/AttachmentSystem.h"
+#include "systems/BombSystem.h"
 
 constexpr int WINDOW_WIDTH = 1024;
 constexpr int WINDOW_HEIGHT = 768;
@@ -259,6 +261,40 @@ void renderLoot(sf::RenderWindow& window, const ComponentStore<TransformComponen
     }
 }
 
+// ← 新增：渲染炸弹（黑色球体）
+void renderBombs(sf::RenderWindow& window, const ComponentStore<TransformComponent>& transforms,
+                 const ComponentStore<BombComponent>& bombs,
+                 const ComponentStore<ZTransformComponent>& zTransforms) {
+    for (Entity entity : bombs.entityList()) {
+        if (!transforms.has(entity)) continue;
+        const auto& transform = transforms.get(entity);
+        const auto& bomb = bombs.get(entity);
+        
+        // 读取 Z 高度
+        float z = zTransforms.has(entity) ? zTransforms.get(entity).z : 0.0f;
+        
+        // 渲染坐标 = 实体位置 - Z 高度
+        float centerX = transform.position.x;
+        float centerY = transform.position.y - z;
+        
+        // 渲染黑色球体（炸弹）
+        sf::CircleShape bombCircle(15.0f);  // 炸弹半径 15px
+        bombCircle.setOrigin({15.0f, 15.0f});
+        bombCircle.setPosition({centerX, centerY});
+        bombCircle.setFillColor(sf::Color(0, 0, 0));  // 黑色
+        
+        // 添加引信效果（红色小点闪烁）
+        float blinkAlpha = 150.0f + 100.0f * std::sin(bomb.fuseTimer * 10.0f);
+        sf::CircleShape fuse(4.0f);
+        fuse.setOrigin({4.0f, 4.0f});
+        fuse.setPosition({centerX + 10.0f, centerY - 10.0f});
+        fuse.setFillColor(sf::Color(255, 0, 0, static_cast<std::uint8_t>(blinkAlpha)));
+        
+        window.draw(bombCircle);
+        window.draw(fuse);
+    }
+}
+
 void renderGrid(sf::RenderWindow& window) {
     for (float x = 0; x < WINDOW_WIDTH; x += 50) {
         sf::VertexArray line(sf::PrimitiveType::Lines, 2);
@@ -304,6 +340,7 @@ int main() {
     ComponentStore<ZTransformComponent> zTransforms;  // ← 新增：Z 轴组件
     ComponentStore<ColliderComponent> colliders;  // ← 新增：圆柱体碰撞器
     ComponentStore<AttachedComponent> attachedComponents;  // ← 新增：依附组件
+    ComponentStore<BombComponent> bombs;  // ← 新增：炸弹组件
 
     // System 初始化
     StateMachineSystem stateSystem;
@@ -321,6 +358,7 @@ int main() {
     DashSystem dashSystem;
     PhysicalCollisionSystem physicalCollisionSystem;  // ← 新增：物理碰撞系统
     AttachmentSystem attachmentSystem;  // ← 新增：依附同步系统
+    BombSystem bombSystem;  // ← 新增：炸弹系统
 
     auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, dashes, magnets, zTransforms, colliders, 200, 300);
     auto dummy = createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, colliders, 700, 300);
@@ -333,6 +371,7 @@ int main() {
     // 输入缓存变量
     bool lastJPressed = false;
     bool lastSpacePressed = false;
+    bool lastBombPressed = false;  // ← 新增：炸弹输入缓存
     
     while (window.isOpen()) {
         sf::Time dtTime = clock.restart();
@@ -397,6 +436,49 @@ int main() {
                 std::cout << "[Jump] Player jumped! vz=800\n";
             }
         }
+        
+        // ← 新增：丢炸弹输入（G 键）
+        bool bombPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::G);
+        if (bombPressed && !lastBombPressed) {
+            // 生成炸弹实体
+            Entity bomb = ecs.create();
+            
+            const auto& playerTrans = transforms.get(player);
+            const auto& playerZ = zTransforms.get(player);
+            
+            // 位置在玩家面前 10 像素处
+            float offsetX = playerTrans.facingX * 10.0f;
+            float offsetY = playerTrans.facingY * 10.0f;
+            
+            transforms.add(bomb, {
+                .position = {playerTrans.position.x + offsetX, playerTrans.position.y + offsetY},
+                .scale = {1.0f, 1.0f},
+                .rotation = 0.0f,
+                .velocity = {0.0f, 0.0f}  // 无水平速度
+            });
+            
+            bombs.add(bomb, {
+                .fuseTimer = 3.0f,  // 3 秒爆炸
+                .isKicked = false
+            });
+            
+            // 关键弹跳初速：出生时向上跃起一下
+            zTransforms.add(bomb, {
+                .z = 20.0f,          // 初始高度 20px
+                .vz = 300.0f,        // 向上初速度 300px/s
+                .gravity = -1500.0f, // 重力加速度
+                .height = 30.0f      // 炸弹物理高度
+            });
+            
+            // 添加碰撞器（可被踢飞）
+            colliders.add(bomb, {
+                .radius = 15.0f,     // 炸弹碰撞半径
+                .isStatic = false
+            });
+            
+            std::cout << "[Bomb] 丢出炸弹！fuse=3.0s\n";
+        }
+        lastBombPressed = bombPressed;
 
         // --- 神圣的 Fixed Timestep 物理循环 ---
         while (timeSinceLastUpdate >= TIME_PER_FRAME) {
@@ -439,6 +521,9 @@ int main() {
             
             attackSystem.update(states, attackStates, transforms, characters, ecs, transforms, hitboxes, lifetimes, attachedComponents, zTransforms, fixedDt);
             collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, zTransforms, damageEvents, ecs, fixedDt);
+            
+            // ← 新增：炸弹系统（倒计时、弹跳、踢飞、爆炸）
+            bombSystem.update(bombs, transforms, zTransforms, states, characters, hitboxes, lifetimes, transforms, ecs, fixedDt);
             damageSystem.update(characters, damageEvents, deathTags, states, dashes);
             
             lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
@@ -479,6 +564,7 @@ int main() {
         
         renderHitboxes(window, transforms, hitboxes, zTransforms);
         renderLoot(window, transforms, itemDatas);
+        renderBombs(window, transforms, bombs, zTransforms);  // ← 新增：渲染炸弹
         window.display();
         
         // ← 调试输出
