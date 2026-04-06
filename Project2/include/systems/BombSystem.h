@@ -186,7 +186,7 @@ public:
                 
                 // ========== 6. 动量传递（核心物理） ==========
                 // 1. XY 平面加速（炸弹比人轻，飞得快）
-                float kickPower = 3000.0f;  // 极高的初始击飞速度
+                float kickPower = 1500.0f;  // ← 击飞速度减半（从 3000 改为 1500）
                 transform.velocity.x = facingX * kickPower;
                 transform.velocity.y = facingY * kickPower;
                 
@@ -196,19 +196,19 @@ public:
                 
                 if (playerZ <= 5.0f) {
                     // A. 地面平踢：标准抛物线
-                    zTrans.vz = 500.0f;
+                    zTrans.vz = 250.0f;  // ← 减半（从 500 改为 250）
                     zTrans.z += 5.0f;  // 强行稍微抬起防卡地
-                    std::cout << "[Bomb] 地面平踢！vz=500\n";
+                    std::cout << "[Bomb] 地面平踢！vz=250\n";
                 } else if (playerVZ > 0.0f) {
                     // B. 跃起挑踢：极高抛物线
-                    zTrans.vz = 900.0f;
-                    std::cout << "[Bomb] 跃起挑踢！vz=900\n";
+                    zTrans.vz = 450.0f;  // ← 减半（从 900 改为 450）
+                    std::cout << "[Bomb] 跃起挑踢！vz=450\n";
                 } else {
                     // C. 下落扣杀 (Spike)：贴地极速直线
-                    zTrans.vz = 100.0f;
+                    zTrans.vz = 50.0f;  // ← 减半（从 100 改为 50）
                     transform.velocity.x *= 1.3f;  // 扣杀带来更高的水平速度
                     transform.velocity.y *= 1.3f;
-                    std::cout << "[Bomb] 下落扣杀！vz=100, 水平速度×1.3\n";
+                    std::cout << "[Bomb] 下落扣杀！vz=50, 水平速度×1.3\n";
                 }
                 
                 std::cout << "[Bomb] ⚽ 被踢飞！velocity=(" << transform.velocity.x 
