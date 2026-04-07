@@ -35,8 +35,8 @@ public:
         const ComponentStore<CharacterComponent>& characters,
         ComponentStore<HitboxComponent>& hitboxes,
         ComponentStore<LifetimeComponent>& lifetimes,
-        ComponentStore<TransformComponent>& hitboxTransforms,
-        ComponentStore<DeathTag>& deathTags,  // ← 新增：DeathTag
+        ComponentStore<TransformComponent>& /*hitboxTransforms*/,  // ← 已废除，使用全局 transforms
+        ComponentStore<DeathTag>& deathTags,
         ECS& ecs,
         float dt)
     {
@@ -67,11 +67,16 @@ public:
                 // 生成爆炸 Hitbox（巨大圆形 AOE）
                 Entity explosion = ecs.create();
                 
-                hitboxTransforms.add(explosion, {
+                std::cout << "[BOMB] 💥 Created Explosion AOE with ID: " << (uint32_t)explosion << std::endl;
+                
+                // ← 添加到全局 transforms
+                transforms.add(explosion, {
                     .position = transform.position,
                     .scale = {1.0f, 1.0f},
                     .rotation = 0.0f,
-                    .velocity = {0.0f, 0.0f}
+                    .velocity = {0.0f, 0.0f},
+                    .facingX = 1.0f,
+                    .facingY = 0.0f
                 });
                 
                 hitboxes.add(explosion, {
@@ -79,10 +84,10 @@ public:
                     .offset = {0.0f, 0.0f},     // 无偏移
                     .damageMultiplier = 100,    // 爆炸伤害
                     .element = ElementType::Fire,
-                    .knockbackForce = 500.0f,
+                    .knockbackForce = 500.0f,   // 旧字段（保留兼容）
                     .sourceEntity = bomb,       // 炸弹是攻击源
-                    .hitHistory = {},
-                    .hitCount = 0,
+                    .knockbackXY = 2000.0f,     // ← 极强的水平击飞
+                    .knockbackZ = 800.0f,       // ← 极强的垂直起飞
                     .active = true
                 });
                 
@@ -140,8 +145,8 @@ public:
                 const auto& playerTrans = transforms.get(player);
                 const auto& playerZTrans = zTransforms.get(player);
                 
-                // 只在 Dash 状态下检测
-                if (playerState.currentState != CharacterState::Dash) {
+                // ← 【核心修复】只在 Dash 状态下检测，且炸弹【还没被踢过】时才能踢！
+                if (playerState.currentState != CharacterState::Dash || bombComp.isKicked) {
                     continue;
                 }
                 

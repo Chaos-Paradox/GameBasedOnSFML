@@ -46,7 +46,10 @@ protected:
     ComponentStore<DeathTag> deathTags;
     ComponentStore<StateMachineComponent> states;
     ComponentStore<MagnetComponent> magnets;
-    ComponentStore<DashComponent> dashes;  // ← 新增：冲刺组件
+    ComponentStore<DashComponent> dashes;  // ← 冲刺组件
+    ComponentStore<ZTransformComponent> zTransforms;  // ← Z 轴组件
+    ComponentStore<DamageTextComponent> damageTexts;  // ← 伤害飘字
+    ComponentStore<LifetimeComponent> lifetimes;  // ← 生命周期
     
     DamageSystem damageSystem;
     LootSpawnSystem lootSpawnSystem;
@@ -62,8 +65,10 @@ protected:
         itemDatas = ComponentStore<ItemDataComponent>();
         pickupBoxes = ComponentStore<PickupBoxComponent>();
         evolutions = ComponentStore<EvolutionComponent>();
-        damageEvents = ComponentStore<DamageEventComponent>();  // ← 改为事件实体
+        damageEvents = ComponentStore<DamageEventComponent>();  // ← 事件实体
         deathTags = ComponentStore<DeathTag>();
+        damageTexts = ComponentStore<DamageTextComponent>();
+        lifetimes = ComponentStore<LifetimeComponent>();
     }
 };
 
@@ -182,13 +187,13 @@ TEST_F(LootPipelineTest, FullPipeline_KillDropPickup) {
     });
     
     // 4. 运行 DamageSystem
-    damageSystem.update(characters, damageEvents, deathTags, states, dashes);
+    damageSystem.update(characters, damageEvents, deathTags, states, dashes, transforms, zTransforms, damageTexts, lifetimes, ecs);
     
     // 5. 运行 LootSpawnSystem
     lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
     
     // 6. 运行 DeathSystem（彻底清理组件）
-    deathSystem.update(states, transforms, characters, hurtboxes, lootDrops, inputs, deathTags, ecs, 0.016f);
+    deathSystem.update(states, transforms, characters, hurtboxes, lootDrops, inputs, deathTags, ecs, evolutions, 0.016f);
     
     // 7. 验证怪物状态切换为 Dead（不销毁实体，由 CleanupSystem 处理）
     if (states.has(monster)) {

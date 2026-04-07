@@ -20,7 +20,10 @@
 #include "../components/BombComponent.h"
 #include "../components/AttachedComponent.h"
 #include "../components/ColliderComponent.h"
+#include "../components/ZTransformComponent.h"
+#include "../components/DamageTextComponent.h"
 #include <vector>
+#include <algorithm>
 
 /**
  * @brief 清理系统（延迟销毁 + 孟婆汤）
@@ -59,22 +62,49 @@ public:
         ComponentStore<BombComponent>& bombs,
         ComponentStore<AttachedComponent>& attachedComponents,
         ComponentStore<ColliderComponent>& colliders,
+        ComponentStore<ZTransformComponent>& zTransforms,
+        ComponentStore<DamageTextComponent>& damageTexts,  // ← 新增：伤害飘字清理
         float dt)
     {
-        // ========== 1. 清理 DeathTag 实体 ==========
+        // ========== 1. 收集所有需要销毁的实体 ==========
+        std::vector<Entity> entitiesToDestroy;
+        
+        // 收集 DeathTag 实体
         auto deathEntities = deathTags.entityList();
+        for (Entity entity : deathEntities) {
+            // 移除 DeathTag（防止重复处理）
+            deathTags.remove(entity);
+            entitiesToDestroy.push_back(entity);
+        }
         
-        // 复制列表，避免迭代中修改
-        std::vector<Entity> toDestroy(deathEntities.begin(), deathEntities.end());
+        // 收集到期 Lifetime 实体
+        auto lifetimeEntities = lifetimes.entityList();
+        for (Entity entity : lifetimeEntities) {
+            if (!lifetimes.has(entity)) continue;
+            
+            auto& lifetime = lifetimes.get(entity);
+            lifetime.timeLeft -= dt;
+            
+            if (lifetime.timeLeft <= 0.0f && lifetime.autoDestroy) {
+                // 避免重复添加
+                if (std::find(entitiesToDestroy.begin(), entitiesToDestroy.end(), entity) == entitiesToDestroy.end()) {
+                    entitiesToDestroy.push_back(entity);
+                }
+            }
+        }
         
-        for (Entity entity : toDestroy) {
+        // ========== 2. 统一执行抹除与销毁 (绝不漏掉任何一个 ComponentStore) ==========
+        for (Entity entity : entitiesToDestroy) {
             // 【核心】灌入孟婆汤：清空所有组件数据
             states.remove(entity);
             transforms.remove(entity);
             characters.remove(entity);
             inputs.remove(entity);
             hurtboxes.remove(entity);
+            
+            // ⚠️ 极其关键：必须清除 hitbox，并确保其内部的 unordered_set 也被清空！
             hitboxes.remove(entity);
+            
             attackStates.remove(entity);
             lifetimes.remove(entity);
             damageTags.remove(entity);
@@ -88,47 +118,14 @@ public:
             bombs.remove(entity);
             attachedComponents.remove(entity);
             colliders.remove(entity);
+            zTransforms.remove(entity);
+            damageTexts.remove(entity);  // ← 新增：清理伤害飘字
             
-            // 抹除所有组件后，再销毁实体 ID
+            // ← 【调试】打印销毁日志
+            std::cout << "[CLEANUP] 🧹 Wiping and Destroying ID: " << (uint32_t)entity << std::endl;
+            
+            // 抹除所有记忆后，安全销毁 ID
             ecs.destroy(entity);
-        }
-        
-        // ========== 2. 清理到期 Lifetime 实体 ==========
-        auto lifetimeEntities = lifetimes.entityList();
-        
-        for (Entity entity : lifetimeEntities) {
-            if (!lifetimes.has(entity)) continue;
-            
-            auto& lifetime = lifetimes.get(entity);
-            lifetime.timeLeft -= dt;
-            
-            if (lifetime.timeLeft <= 0.0f) {
-                if (lifetime.autoDestroy) {
-                    // 【核心】灌入孟婆汤：清空所有组件数据
-                    states.remove(entity);
-                    transforms.remove(entity);
-                    characters.remove(entity);
-                    inputs.remove(entity);
-                    hurtboxes.remove(entity);
-                    hitboxes.remove(entity);
-                    attackStates.remove(entity);
-                    lifetimes.remove(entity);
-                    damageTags.remove(entity);
-                    deathTags.remove(entity);
-                    lootDrops.remove(entity);
-                    itemDatas.remove(entity);
-                    pickupBoxes.remove(entity);
-                    magnets.remove(entity);
-                    evolutions.remove(entity);
-                    dashes.remove(entity);
-                    bombs.remove(entity);
-                    attachedComponents.remove(entity);
-                    colliders.remove(entity);
-                    
-                    // 抹除所有组件后，再销毁实体 ID
-                    ecs.destroy(entity);
-                }
-            }
         }
     }
 };

@@ -24,6 +24,11 @@ struct DamageEventComponent {
     Vec2 hitPosition{0.0f, 0.0f};     // 打击发生的世界坐标
     bool isCritical{false};           // 是否暴击（浮动倍率 > 1.1f）
     
+    // ← 【新增】击飞参数（支持战斗物理）
+    Vec2 hitDirection{0.0f, 0.0f};    // 力的方向（归一化）
+    float knockbackXY{0.0f};          // 水平击飞力度
+    float knockbackZ{0.0f};           // 垂直挑飞力度
+    
     // 来源信息（可选）
     Entity attacker{INVALID_ENTITY};  // 攻击者实体 ID
     float timestamp{0.0f};            // 事件创建时间（用于调试）

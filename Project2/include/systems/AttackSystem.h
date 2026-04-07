@@ -27,7 +27,6 @@ public:
         ComponentStore<TransformComponent>& transforms,
         const ComponentStore<CharacterComponent>& characters,
         ECS& ecs,
-        ComponentStore<TransformComponent>& hitboxTransforms,
         ComponentStore<HitboxComponent>& hitboxes,
         ComponentStore<LifetimeComponent>& lifetimes,
         ComponentStore<AttachedComponent>& attachedComponents,
@@ -86,27 +85,41 @@ public:
             // 创建 Hitbox 临时实体
             Entity hitboxEntity = ecs.create();
             
+            std::cout << "[ATTACK] 🗡️ Created Sword Hitbox with ID: " << (uint32_t)hitboxEntity << std::endl;
+            
             float offsetX = transform.facingX * 50.0f;
             float offsetY = transform.facingY * 50.0f;
             
-            hitboxTransforms.add(hitboxEntity, {
+            // ← 【核心修复】添加到全局唯一的 transforms！显式覆盖所有字段防止脏数据！
+            transforms.add(hitboxEntity, {
                 .position = {transform.position.x + offsetX, transform.position.y + offsetY},
                 .scale = {1.0f, 1.0f},
                 .rotation = 0.0f,
-                .velocity = {0.0f, 0.0f}
+                .velocity = {0.0f, 0.0f},  // 剑气不需要速度，清零
+                .facingX = transform.facingX,
+                .facingY = transform.facingY
             });
             
             hitboxes.add(hitboxEntity, {
-                .radius = 35.0f,  // 圆形 Hitbox 半径 35px（近战攻击）
-                .offset = {offsetX, offsetY},  // 相对于攻击者的偏移
-                .damageMultiplier = 10,
+                .radius = 35.0f,              // 必须显式指定
+                .offset = {offsetX, offsetY}, // 必须显式指定
+                .damageMultiplier = 10,       // 必须显式指定
                 .element = ElementType::Physical,
                 .knockbackForce = 100.0f,
                 .sourceEntity = entity,
-                .hitHistory = {},
-                .hitCount = 0,
+                .knockbackXY = 0.0f,          // ← 必须清零击飞！
+                .knockbackZ = 0.0f,           // ← 必须清零起飞！
+                .hitTargets = {},             // ← 清空前世的打击记录！
                 .active = true
             });
+            
+            // ← 【内存验尸】检查组件残留
+            const auto& hb = hitboxes.get(hitboxEntity);
+            std::cout << "[DEBUG] 🗡️ Sword Hitbox ID: " << (uint32_t)hitboxEntity
+                      << " | Radius: " << hb.radius
+                      << " | KnockbackXY: " << hb.knockbackXY
+                      << " | HitTargets size: " << hb.hitTargets.size()
+                      << std::endl;
             
             // ← 【核心改动】挂载依附组件（同步 XY 位置）
             attachedComponents.add(hitboxEntity, {

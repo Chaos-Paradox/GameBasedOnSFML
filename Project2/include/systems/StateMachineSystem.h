@@ -60,7 +60,8 @@ public:
             // 不可打断状态
             if (state.currentState == CharacterState::Dash ||
                 state.currentState == CharacterState::Hurt ||
-                state.currentState == CharacterState::Dead) {
+                state.currentState == CharacterState::Dead ||
+                state.currentState == CharacterState::KnockedAirborne) {  // ← 浮空期间绝对不可打断！
                 canBeInterrupted = false;
             }
             
@@ -136,15 +137,23 @@ public:
             // 核心设计：pendingIntent 是唯一指令源，Attack/Dash 共享同一通道
             // 精准消费：只有成功切入时才清零，让时间自然流逝过期
             if (input.pendingIntent == ActionIntent::Attack && input.intentTimer > 0.0f) {
+                // ← 【调试】检查是否已有 AttackState
+                bool hasExistingAttack = attackStates.has(entity);
+                if (hasExistingAttack) {
+                    std::cout << "[StateMachine] ⚠️ 玩家已有 AttackState！强制覆盖 (hitTimer=" << attackStates.get(entity).hitTimer << ")\n";
+                }
+                
                 state.currentState = CharacterState::Attack;
                 state.previousState = CharacterState::Attack;
                 
-                // 初始化攻击状态组件
+                // 初始化攻击状态组件（覆盖旧的）
                 ecs.addComponent<AttackStateComponent>(entity, attackStates, {
                     .hitTimer = 0.15f,
                     .hitDuration = 0.15f,
                     .hitActivated = false
                 });
+                
+                std::cout << "[StateMachine] 🗡️ 攻击意图消费！pendingIntent=Attack\n";
                 
                 // 精准消费：清零意图
                 if (inputs.has(entity)) {

@@ -10,6 +10,65 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <unordered_map>
+
+// ========== 输入映射系统 ==========
+
+/**
+ * @brief 逻辑动作枚举（与硬件按键解耦）
+ */
+enum class GameAction {
+    Up, Down, Left, Right,
+    Attack, Dash, DropBomb,
+    ToggleHelp
+};
+
+/**
+ * @brief 按键绑定配置类
+ */
+struct KeyBindings {
+    std::unordered_map<GameAction, sf::Keyboard::Key> bindings;
+    
+    // 设置默认按键（SFML 3 使用 Scan 扫描码）
+    KeyBindings() {
+        bindings[GameAction::Up] = sf::Keyboard::Key::W;
+        bindings[GameAction::Down] = sf::Keyboard::Key::S;
+        bindings[GameAction::Left] = sf::Keyboard::Key::A;
+        bindings[GameAction::Right] = sf::Keyboard::Key::D;
+        bindings[GameAction::Attack] = sf::Keyboard::Key::J;
+        bindings[GameAction::Dash] = sf::Keyboard::Key::Space;
+        bindings[GameAction::DropBomb] = sf::Keyboard::Key::G;
+        bindings[GameAction::ToggleHelp] = sf::Keyboard::Key::F1;
+    }
+    
+    bool isActionPressed(GameAction action) const {
+        auto it = bindings.find(action);
+        if (it != bindings.end()) {
+            return sf::Keyboard::isKeyPressed(it->second);
+        }
+        return false;
+    }
+    
+    // 获取按键名称（用于 UI 显示）
+    std::string getKeyName(GameAction action) const {
+        auto it = bindings.find(action);
+        if (it != bindings.end()) {
+            switch (it->second) {
+                case sf::Keyboard::Key::W: return "W";
+                case sf::Keyboard::Key::A: return "A";
+                case sf::Keyboard::Key::S: return "S";
+                case sf::Keyboard::Key::D: return "D";
+                case sf::Keyboard::Key::J: return "J";
+                case sf::Keyboard::Key::K: return "K";
+                case sf::Keyboard::Key::G: return "G";
+                case sf::Keyboard::Key::Space: return "Space";
+                case sf::Keyboard::Key::F1: return "F1";
+                default: return "?";
+            }
+        }
+        return "?";
+    }
+};
 
 #include "core/ECS.h"
 #include "core/Entity.h"
@@ -53,6 +112,8 @@
 #include "systems/AttachmentSystem.h"
 #include "systems/BombSystem.h"
 #include "systems/CleanupSystem.h"
+#include "systems/DamageTextSpawnerSystem.h"
+#include "systems/DamageTextRenderSystem.h"
 
 constexpr int WINDOW_WIDTH = 1024;
 constexpr int WINDOW_HEIGHT = 768;
@@ -78,12 +139,25 @@ std::string stateToString(CharacterState state) {
     }
 }
 
-Vec2 getInputFromKeyboard() {
+/**
+ * @brief 根据按键绑定获取移动输入（已归一化）
+ */
+Vec2 getMappedInput(const KeyBindings& keys) {
     Vec2 dir{0.0f, 0.0f};
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up)) dir.y -= 1.0f;
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down)) dir.y += 1.0f;
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left)) dir.x -= 1.0f;
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right)) dir.x += 1.0f;
+    if (keys.isActionPressed(GameAction::Up)) dir.y -= 1.0f;
+    if (keys.isActionPressed(GameAction::Down)) dir.y += 1.0f;
+    if (keys.isActionPressed(GameAction::Left)) dir.x -= 1.0f;
+    if (keys.isActionPressed(GameAction::Right)) dir.x += 1.0f;
+    
+    // 向量归一化，防止斜向移动速度变成 1.414 倍
+    if (dir.x != 0.0f || dir.y != 0.0f) {
+        float length = std::sqrt(dir.x * dir.x + dir.y * dir.y);
+        if (length > 0.0f) {
+            dir.x /= length;
+            dir.y /= length;
+        }
+    }
+    
     return dir;
 }
 
@@ -132,7 +206,8 @@ auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compo
     // ← 新增：赋予玩家圆柱体碰撞器（动态实体）
     colliders.add(player, {
         .radius = 20.0f,
-        .isStatic = false
+        .isStatic = false,
+        .mass = 100.0f  // 玩家质量大，不易被推开
     });
     
     return player;
@@ -158,7 +233,8 @@ auto createDummy(ECS& ecs, ComponentStore<StateMachineComponent>& states, Compon
     // ← 新增：赋予假人圆柱体碰撞器（动态实体）
     colliders.add(dummy, {
         .radius = 20.0f,
-        .isStatic = false
+        .isStatic = false,
+        .mass = 100.0f  // 假人质量大，不易被推开
     });
     
     return dummy;
@@ -340,9 +416,10 @@ int main() {
     ComponentStore<EvolutionComponent> evolutions;
     ComponentStore<DashComponent> dashes;
     ComponentStore<ZTransformComponent> zTransforms;  // ← 新增：Z 轴组件
-    ComponentStore<ColliderComponent> colliders;  // ← 新增：圆柱体碰撞器
-    ComponentStore<AttachedComponent> attachedComponents;  // ← 新增：依附组件
-    ComponentStore<BombComponent> bombs;  // ← 新增：炸弹组件
+    ComponentStore<ColliderComponent> colliders;  // ← 圆柱体碰撞器
+    ComponentStore<AttachedComponent> attachedComponents;  // ← 依附组件
+    ComponentStore<BombComponent> bombs;  // ← 炸弹组件
+    ComponentStore<DamageTextComponent> damageTexts;  // ← 伤害飘字组件
 
     // System 初始化
     StateMachineSystem stateSystem;
@@ -359,8 +436,16 @@ int main() {
     DebugSystem debugSystem;
     DashSystem dashSystem;
     PhysicalCollisionSystem physicalCollisionSystem;  // ← 新增：物理碰撞系统
-    AttachmentSystem attachmentSystem;  // ← 新增：依附同步系统
-    BombSystem bombSystem;  // ← 新增：炸弹系统
+    AttachmentSystem attachmentSystem;  // ← 依附同步系统
+    BombSystem bombSystem;  // ← 炸弹系统
+    DamageTextSpawnerSystem damageTextSpawnerSystem;  // ← 伤害飘字生成系统
+    DamageTextRenderSystem damageTextRenderSystem;    // ← 伤害飘字渲染系统
+    
+    // ← 加载字体资源（SFML 3 使用 sf::Font::openFromFile）
+    sf::Font font;
+    if (!font.openFromFile("/System/Library/Fonts/Supplemental/Arial Unicode.ttf")) {
+        font.openFromFile("/System/Library/Fonts/Helvetica.ttc");
+    }
 
     auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, dashes, magnets, zTransforms, colliders, 200, 300);
     auto dummy = createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, colliders, 700, 300);
@@ -370,10 +455,20 @@ int main() {
     sf::Time timeSinceLastUpdate = sf::Time::Zero;
     sf::Clock clock, debugClock;
     
+    // ← 【新增】输入映射器
+    KeyBindings keybinds;
+    
     // 输入缓存变量
-    bool lastJPressed = false;
-    bool lastSpacePressed = false;
-    bool lastBombPressed = false;  // ← 新增：炸弹输入缓存
+    bool lastAttackPressed = false;
+    bool lastDashPressed = false;
+    bool lastBombPressed = false;
+    bool lastHelpPressed = false;
+    
+    // ← 【新增】UI 帮助面板开关
+    bool showHelpUI = false;
+    
+    // ← 【新增】复活倒计时
+    float respawnTimer = 0.0f;  // 死后 2 秒复活
     
     while (window.isOpen()) {
         sf::Time dtTime = clock.restart();
@@ -407,45 +502,66 @@ int main() {
             }
         }
         
-        // --- 循环外：抓取瞬时输入 ---
-        inputs.get(player).moveDir = getInputFromKeyboard();
+        // --- 循环外：抓取瞬时输入（使用输入映射系统）---
+        
+        // ← 【新增】UI 帮助面板切换
+        bool currentHelpPressed = keybinds.isActionPressed(GameAction::ToggleHelp);
+        if (currentHelpPressed && !lastHelpPressed) {
+            showHelpUI = !showHelpUI;  // 翻转开关
+            std::cout << "[UI] Help overlay: " << (showHelpUI ? "ON" : "OFF") << "\n";
+        }
+        lastHelpPressed = currentHelpPressed;
+        
+        // 抓取移动输入（已归一化）
+        inputs.get(player).moveDir = getMappedInput(keybinds);
         
         // ← 【工业级】单轨覆盖指令槽：Last-In-Wins 原则
-        // 核心设计：新指令无条件覆盖旧指令，并重置 0.2 秒保质期
-        // 这样即使同时按 J+Space，也会以最后按下的为准，避免逻辑死锁
-        bool currentJPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::J);
-        if (currentJPressed && !lastJPressed) {
+        bool currentAttackPressed = keybinds.isActionPressed(GameAction::Attack);
+        if (currentAttackPressed && !lastAttackPressed) {
             inputs.get(player).pendingIntent = ActionIntent::Attack;
             inputs.get(player).intentTimer = 0.2f;  // 0.2 秒保质期
+            std::cout << "[Input] 🗡️ Attack pressed!\n";
         }
-        lastJPressed = currentJPressed;
+        lastAttackPressed = currentAttackPressed;
 
-        bool currentSpacePressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
-        if (currentSpacePressed && !lastSpacePressed) {
+        bool currentDashPressed = keybinds.isActionPressed(GameAction::Dash);
+        if (currentDashPressed && !lastDashPressed) {
             // ← 冲刺指令覆盖攻击指令（Last-In-Wins）
             inputs.get(player).pendingIntent = ActionIntent::Dash;
             inputs.get(player).intentTimer = 0.2f;  // 重置保质期
-            // 注意：DashSystem 直接从 inputs 读取意图，不需要额外信号
+            std::cout << "[Input] 💨 Dash pressed!\n";
         }
-        lastSpacePressed = currentSpacePressed;
+        lastDashPressed = currentDashPressed;
         
-        // ← 新增：跳跃输入（K 键）
+        // ← 跳跃输入（K 键）
         bool jumpPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::K);
         if (jumpPressed && zTransforms.has(player)) {
             auto& zComp = zTransforms.get(player);
             if (zComp.isGrounded()) {
-                zComp.jump(800.0f);  // ← 跳跃高度翻倍（从 400 改为 800）
+                zComp.jump(800.0f);
                 std::cout << "[Jump] Player jumped! vz=800\n";
             }
         }
         
-        // ← 新增：丢炸弹输入（G 键）
-        bool bombPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::G);
-        if (bombPressed && !lastBombPressed) {
+        // ← 丢炸弹输入（使用输入映射系统）
+        bool bombPressed = keybinds.isActionPressed(GameAction::DropBomb);
+        
+        // ← 【新增】炸弹放置 CD 检测
+        static float bombCooldown = 0.0f;
+        if (bombCooldown > 0.0f) {
+            bombCooldown -= dtTime.asSeconds();
+        }
+        
+        if (bombPressed && !lastBombPressed && bombCooldown <= 0.0f) {
             // 生成炸弹实体
             Entity bomb = ecs.create();
             
-            const auto& playerTrans = transforms.get(player);
+            std::cout << "[Bomb] 📦 放置炸弹！ID=" << (uint32_t)bomb << " CD=0.5s\n";
+            
+            // 设置 0.5 秒 CD
+            bombCooldown = 0.5f;
+                
+                const auto& playerTrans = transforms.get(player);
             const auto& playerZ = zTransforms.get(player);
             
             // ← 【修复】获取朝向（如果 facing 为 0，使用移动方向或默认向右）
@@ -498,7 +614,8 @@ int main() {
             // ← 【修复】添加物理碰撞体（半径 12px，可被推开）
             colliders.add(bomb, {
                 .radius = 12.0f,     // 炸弹碰撞半径
-                .isStatic = false
+                .isStatic = false,
+                .mass = 1.0f         // 炸弹质量小，容易被踢飞
             });
             
             std::cout << "[Bomb] 丢出炸弹！fuse=3.0s pos=(" 
@@ -530,15 +647,42 @@ int main() {
             
             magnetSystem.update(transforms, magnets, transforms, itemDatas, fixedDt);
             
-            // ← 新增：Z 轴物理更新（应用重力）
+            // 🚀 【核心修正】踢击判定与动量施加，必须在移动之前！
+            // 这样炸弹因为速度更快，依然在玩家前方，不会误判圆心导致反向排斥
+            bombSystem.update(bombs, transforms, zTransforms, states, characters, hitboxes, lifetimes, transforms, deathTags, ecs, fixedDt);
+            
+            // ← 【核心改动】Z 轴物理更新（应用重力 + 落地恢复）
             for (Entity entity : zTransforms.entityList()) {
                 if (zTransforms.has(entity)) {
-                    zTransforms.get(entity).applyGravity(fixedDt);
+                    auto& zTrans = zTransforms.get(entity);
+                    zTrans.applyGravity(fixedDt);
+                    
+                    // 落地检测
+                    if (zTrans.z <= 0.0f) {
+                        zTrans.z = 0.0f;
+                        
+                        // ← 【新增】落地时恢复控制：如果实体处于击飞状态，则解除
+                        if (states.has(entity)) {
+                            auto& state = states.get(entity);
+                            if (state.currentState == CharacterState::KnockedAirborne) {
+                                state.currentState = CharacterState::Idle;
+                                state.previousState = CharacterState::Idle;
+                                std::cout << "[ZPhysics] 🛬 落地恢复！Entity " << entity << " → Idle\n";
+                            }
+                        }
+                        
+                        // 保留原有的弹跳逻辑（炸弹等）
+                        if (zTrans.vz < 0.0f && std::abs(zTrans.vz) > 50.0f) {
+                            zTrans.vz = -zTrans.vz * 0.5f;
+                        } else {
+                            zTrans.vz = 0.0f;
+                        }
+                    }
                 }
             }
             
             // 位移执行系统（将冲刺速度化为实质距离）
-            movementSystem.update(transforms, itemDatas, fixedDt);
+            movementSystem.update(transforms, itemDatas, states, bombs, zTransforms, fixedDt);
             
             // ← 新增：物理碰撞系统（圆柱体排斥，在 Movement 之后，战斗碰撞之前）
             physicalCollisionSystem.update(colliders, transforms, fixedDt);
@@ -546,17 +690,32 @@ int main() {
             // ← 新增：依附同步系统（同步 Hitbox 到主人）
             attachmentSystem.update(attachedComponents, transforms, zTransforms, fixedDt);
             
-            attackSystem.update(states, attackStates, transforms, characters, ecs, transforms, hitboxes, lifetimes, attachedComponents, zTransforms, fixedDt);
-            collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, zTransforms, damageEvents, ecs, fixedDt);
+            attackSystem.update(states, attackStates, transforms, characters, ecs, hitboxes, lifetimes, attachedComponents, zTransforms, fixedDt);
+            collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, zTransforms, damageEvents, ecs, fixedDt);  // ← hitboxes 现在是非 const
             
-            // ← 新增：炸弹系统（倒计时、弹跳、踢飞、爆炸）
-            bombSystem.update(bombs, transforms, zTransforms, states, characters, hitboxes, lifetimes, transforms, deathTags, ecs, fixedDt);
-            damageSystem.update(characters, damageEvents, deathTags, states, dashes);
+            damageSystem.update(characters, damageEvents, deathTags, states, dashes, transforms, zTransforms, damageTexts, lifetimes, ecs);
             
             lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
-            deathSystem.update(states, transforms, characters, hurtboxes, lootDrops, inputs, deathTags, ecs, fixedDt);
+            deathSystem.update(states, transforms, characters, hurtboxes, lootDrops, inputs, deathTags, ecs, evolutions, fixedDt);  // ← 新增 evolutions 参数
             
             pickupSystem.update(ecs, evolutions, transforms, transforms, itemDatas, pickupBoxes, magnets);
+            
+            // ← 【新增】玩家复活逻辑
+            if (states.get(player).currentState == CharacterState::Dead) {
+                respawnTimer += fixedDt;
+                if (respawnTimer >= 2.0f) {  // 死后 2 秒复活
+                    // 满血复活
+                    characters.get(player).currentHP = characters.get(player).maxHP;
+                    states.get(player).currentState = CharacterState::Idle;
+                    states.get(player).previousState = CharacterState::Idle;
+                    states.get(player).stateTimer = 0.0f;
+                    // 传送回出生点
+                    transforms.get(player).position = {200.0f, 300.0f};
+                    transforms.get(player).velocity = {0.0f, 0.0f};
+                    respawnTimer = 0.0f;
+                    std::cout << "[Respawn] Player revived! HP=100, pos=(200,300)\n";
+                }
+            }
         }
         
         // ← 【核心改动】清理系统（在渲染之后，帧末执行）
@@ -566,6 +725,8 @@ int main() {
             lootDrops, itemDatas, pickupBoxes,
             magnets, evolutions, dashes,
             bombs, attachedComponents, colliders,
+            zTransforms,
+            damageTexts,  // ← 新增：伤害飘字清理
             TIME_PER_FRAME.asSeconds());
         
         // --- 循环外：纯渲染 ---
@@ -599,7 +760,42 @@ int main() {
         
         renderHitboxes(window, transforms, hitboxes, zTransforms);
         renderLoot(window, transforms, itemDatas);
-        renderBombs(window, transforms, bombs, zTransforms);  // ← 新增：渲染炸弹
+        renderBombs(window, transforms, bombs, zTransforms);  // ← 渲染炸弹
+        
+        // ← 伤害飘字渲染
+        damageTextRenderSystem.update(damageTexts, window, font, ecs, TIME_PER_FRAME.asSeconds());
+        
+        // ← 【新增】UI 帮助面板渲染
+        if (showHelpUI) {
+            // 1. 画一个半透明的黑色背景板
+            sf::RectangleShape overlay({320.0f, 280.0f});
+            overlay.setPosition(sf::Vector2f(10.0f, 10.0f));
+            overlay.setFillColor(sf::Color(0, 0, 0, 200));
+            overlay.setOutlineColor(sf::Color(255, 255, 255, 255));
+            overlay.setOutlineThickness(2.0f);
+            window.draw(overlay);
+            
+            // 2. 准备文字（SFML 3 需要传入 font）
+            sf::Text helpText(font, "", 15);
+            helpText.setFillColor(sf::Color(255, 255, 255, 255));
+            helpText.setPosition(sf::Vector2f(20.0f, 20.0f));
+            
+            // 3. 构建提示字符串（使用动态按键绑定）
+            std::string info = "=== Key Bindings ===\n\n";
+            info += "[" + keybinds.getKeyName(GameAction::Up) + "] : Move Up\n";
+            info += "[" + keybinds.getKeyName(GameAction::Down) + "] : Move Down\n";
+            info += "[" + keybinds.getKeyName(GameAction::Left) + "] : Move Left\n";
+            info += "[" + keybinds.getKeyName(GameAction::Right) + "] : Move Right\n\n";
+            info += "[" + keybinds.getKeyName(GameAction::Attack) + "] : Attack\n";
+            info += "[" + keybinds.getKeyName(GameAction::Dash) + "] : Dash / Kick Bomb\n";
+            info += "[" + keybinds.getKeyName(GameAction::DropBomb) + "] : Drop Bomb\n";
+            info += "[" + keybinds.getKeyName(GameAction::ToggleHelp) + "] : Toggle Help\n\n";
+            info += "Press [" + keybinds.getKeyName(GameAction::ToggleHelp) + "] to close.";
+            
+            helpText.setString(info);
+            window.draw(helpText);
+        }
+        
         window.display();
         
         // ← 调试输出

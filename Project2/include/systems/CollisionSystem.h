@@ -29,7 +29,7 @@
 class CollisionSystem {
 public:
     void update(
-        const ComponentStore<HitboxComponent>& hitboxes,
+        ComponentStore<HitboxComponent>& hitboxes,  // ← 改为非 const，需要修改 hitTargets
         const ComponentStore<HurtboxComponent>& hurtboxes,
         const ComponentStore<TransformComponent>& hitboxTransforms,
         const ComponentStore<TransformComponent>& targetTransforms,
@@ -89,8 +89,11 @@ public:
                     continue;
                 }
                 
-                // 命中历史检测
-                if (hasHitEntity(hitbox, hurtboxEntity)) continue;
+                // ← 【打击记录簿】如果这个受害者已经在记录簿里了，跳过！
+                if (hitbox.hitTargets.find(hurtboxEntity) != hitbox.hitTargets.end()) {
+                    std::cout << "[Collision] ⚠️ 跳过重复命中！Hitbox=" << hitboxEntity << " target=" << hurtboxEntity << " (hitTargets.size=" << hitbox.hitTargets.size() << ")\n";
+                    continue;  // 这发 Hitbox 已经打过这个目标了
+                }
                 
                 const auto& targetTransform = targetTransforms.get(hurtboxEntity);
                 
@@ -155,19 +158,34 @@ public:
                           << " Z 轴相交 attackerZ=" << attackerZ 
                           << " victimZ=" << victimZ << "\n";
                 
-                // 添加到命中历史
+                // ← 【打击记录簿】伤害结算完成后，将其登记到记录簿中，保证这发 Hitbox 这辈子只能打他一次！
                 HitboxComponent& mutableHitbox = const_cast<HitboxComponent&>(hitbox);
-                addToHitHistory(mutableHitbox, hurtboxEntity);
+                mutableHitbox.hitTargets.insert(hurtboxEntity);
+                std::cout << "[Collision] 📖 登记到 hitTargets！Hitbox=" << hitboxEntity << " target=" << hurtboxEntity << " (size=" << mutableHitbox.hitTargets.size() << ")\n";
                 
                 // 计算打击位置（两个圆心的中点）
                 float hitX = (hitboxWorldX + hurtboxWorldX) / 2.0f;
                 float hitY = (hitboxWorldY + hurtboxWorldY) / 2.0f;
                 
-                // 创建伤害事件实体
+                // ← 【新增】计算击飞方向（从攻击者指向受害者）
+                float knockbackDirX = hurtboxWorldX - hitboxWorldX;
+                float knockbackDirY = hurtboxWorldY - hitboxWorldY;
+                float knockbackLen = std::sqrt(knockbackDirX * knockbackDirX + knockbackDirY * knockbackDirY);
+                if (knockbackLen > 0.001f) {
+                    knockbackDirX /= knockbackLen;
+                    knockbackDirY /= knockbackLen;
+                } else {
+                    knockbackDirX = 1.0f;
+                    knockbackDirY = 0.0f;
+                }
+                
+                // 创建伤害事件实体（传递击飞参数）
                 Entity eventEntity = createDamageEvent(
                     ecs, damageEvents,
                     hitbox, hurtboxEntity, hitbox.sourceEntity,
-                    hitX, hitY
+                    hitX, hitY,
+                    knockbackDirX, knockbackDirY,
+                    hitbox.knockbackXY, hitbox.knockbackZ
                 );
                 
                 (void)eventEntity;  // 事件实体已创建，由 DamageSystem 处理
@@ -194,7 +212,9 @@ private:
         const HitboxComponent& hitbox,
         Entity target,
         Entity attacker,
-        float hitX, float hitY)
+        float hitX, float hitY,
+        float knockbackDirX, float knockbackDirY,  // ← 新增：击飞方向
+        float knockbackXY, float knockbackZ)       // ← 新增：击飞力度
     {
         Entity eventEntity = ecs.create();
         
@@ -207,36 +227,27 @@ private:
         // 计算最终伤害
         int actualDamage = static_cast<int>(hitbox.damageMultiplier * randomMultiplier);
         
-        // 挂载 DamageEventComponent
+        // 挂载 DamageEventComponent（包含击飞参数）
         damageEvents.add(eventEntity, {
             .target = target,
             .actualDamage = actualDamage,
             .hitPosition = {hitX, hitY},
             .isCritical = isCritical,
+            .hitDirection = {knockbackDirX, knockbackDirY},
+            .knockbackXY = knockbackXY,
+            .knockbackZ = knockbackZ,
             .attacker = attacker,
-            .timestamp = 0.0f  // 由主循环设置
+            .timestamp = 0.0f
         });
         
         std::cout << "[Collision] 伤害事件：target=" << target 
                   << " damage=" << actualDamage 
+                  << " knockbackXY=" << knockbackXY 
+                  << " knockbackZ=" << knockbackZ
                   << " (multiplier=" << randomMultiplier 
                   << ", crit=" << (isCritical ? "YES" : "NO") << ")\n";
         
         return eventEntity;
     }
     
-    bool hasHitEntity(const HitboxComponent& hitbox, Entity target) const {
-        for (int i = 0; i < hitbox.hitCount && i < HitboxComponent::MAX_HIT_COUNT; ++i) {
-            if (hitbox.hitHistory[i] == target) {
-                return true;
-            }
-        }
-        return false;
-    }
-    
-    void addToHitHistory(HitboxComponent& hitbox, Entity target) {
-        if (hitbox.hitCount < HitboxComponent::MAX_HIT_COUNT) {
-            hitbox.hitHistory[hitbox.hitCount++] = target;
-        }
-    }
 };

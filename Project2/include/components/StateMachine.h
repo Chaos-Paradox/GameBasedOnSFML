@@ -6,9 +6,10 @@ enum class CharacterState : uint8_t {
     Idle,       // 待机
     Move,       // 移动
     Attack,     // 攻击
-    Dash,       // 冲刺（新增）
+    Dash,       // 冲刺
     Hurt,       // 受伤
     Dead,       // 死亡
+    KnockedAirborne,  // ← 新增：击飞浮空（硬控状态）
 };
 
 /**
