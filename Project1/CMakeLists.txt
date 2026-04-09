@@ -11,11 +11,32 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 file(GLOB SRC_FILES "src/*.cpp")
 
 # 创建库
-add_library(${PROJECT_NAME} ${SRC_FILES})
+add_library(${PROJECT_NAME} STATIC ${SRC_FILES})
 
-# 链接 SFML (使用 find_package 找到的 SFML target)
-find_package(SFML 3 COMPONENTS Graphics Audio Window System REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE SFML::Graphics SFML::Audio SFML::Window SFML::System)
+# 跨平台 SFML 链接
+if(APPLE)
+    # macOS - 使用 CMake targets
+    find_package(SFML 3 COMPONENTS Graphics Audio Window System REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PRIVATE SFML::Graphics SFML::Audio SFML::Window SFML::System)
+    
+elseif(WIN32)
+    # Windows - 使用静态库
+    target_link_libraries(${PROJECT_NAME} PRIVATE
+        sfml-graphics-s
+        sfml-window-s
+        sfml-system-s
+        sfml-audio-s
+        opengl32
+        freetype
+        winmm
+        gdi32
+    )
+    
+elseif(UNIX)
+    # Linux - 使用 CMake targets
+    find_package(SFML 3 COMPONENTS Graphics Audio Window System REQUIRED)
+    target_link_libraries(${PROJECT_NAME} PRIVATE SFML::Graphics SFML::Audio SFML::Window SFML::System)
+endif()
 
 # 设置输出目录
 set_target_properties(${PROJECT_NAME} PROPERTIES
