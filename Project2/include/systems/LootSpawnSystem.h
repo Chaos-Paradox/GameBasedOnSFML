@@ -58,8 +58,8 @@ public:
                     Entity lootEntity = ecs.create();
                     
                     // 【修复】添加随机抖动 (±20 像素)
-                    float jitterX = (static_cast<float>(std::rand()) / RAND_MAX) * 40.0f - 20.0f;
-                    float jitterY = (static_cast<float>(std::rand()) / RAND_MAX) * 40.0f - 20.0f;
+                    float jitterX = (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 40.0f - 20.0f;
+                    float jitterY = (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 40.0f - 20.0f;
                     
                     // 【修复】Transform：必须使用死者的 position + 抖动！
                     transforms.add(lootEntity, {
@@ -68,8 +68,8 @@ public:
                         .rotation = 0.0f,
                         // ← 新增：爆米花抛射效果（更快的初速度）
                         .velocity = {
-                            (static_cast<float>(std::rand()) / RAND_MAX) * 120.0f - 60.0f,  // x: -60 ~ 60
-                            (static_cast<float>(std::rand()) / RAND_MAX) * -120.0f - 80.0f  // y: -200 ~ -80 (向上更快)
+                            (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 120.0f - 60.0f,  // x: -60 ~ 60
+                            (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * -120.0f - 80.0f  // y: -200 ~ -80 (向上更快)
                         }
                     });
                     

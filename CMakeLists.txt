@@ -12,6 +12,35 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 option(CMAKE_BUILD_TYPE "Release")
 
+# GTest 可选支持
+option(ENABLE_TESTS "Enable unit tests with Google Test" OFF)
+
+if(ENABLE_TESTS)
+    message(STATUS "Unit tests enabled")
+    
+    # 优先使用系统安装的 GTest，失败时尝试 FetchContent
+    find_package(GTest QUIET)
+    if(GTest_FOUND)
+        message(STATUS "Using system GTest: ${GTest_VERSION}")
+    else()
+        message(STATUS "System GTest not found, using FetchContent...")
+        include(FetchContent)
+        FetchContent_Declare(
+            googletest
+            GIT_REPOSITORY https://github.com/google/googletest.git
+            GIT_TAG v1.15.2
+            DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+        )
+        # Windows MSVC: 使用静态运行时，避免 DLL 问题
+        if(MSVC)
+            set(gtest_force_shared_crt OFF CACHE BOOL "Use static runtime" FORCE)
+        endif()
+        FetchContent_MakeAvailable(googletest)
+    endif()
+    
+    enable_testing()
+endif()
+
 # 设置字体文件路径（跨平台）
 set(FONT_PATH "${CMAKE_SOURCE_DIR}/material/fonts/Arial.ttf")
 add_definitions(-DFONT_PATH="${FONT_PATH}")
