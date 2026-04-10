@@ -14,6 +14,19 @@
 #include <cstdlib>
 
 /**
+ * @brief GameJuice 全局打击感状态器
+ * 
+ * 控制时间流速（顿帧 Hit-Stop）和屏幕震动（Camera Shake）
+ * 由 DamageSystem 触发，由 VisualSandbox 主循环消费
+ */
+struct GameJuice {
+    float timeScale{1.0f};         // 游戏世界时间流速
+    float hitStopTimer{0.0f};      // 顿帧剩余时间（真实时间）
+    float shakeTimer{0.0f};        // 震动剩余时间（真实时间）
+    float shakeIntensity{0.0f};    // 当前震动强度（像素偏移量）
+};
+
+/**
  * @brief 伤害结算系统（纯粹的执行者）
  * 
  * 职责：
@@ -37,9 +50,10 @@ public:
         const ComponentStore<DashComponent>& dashes,
         ComponentStore<TransformComponent>& transforms,
         ComponentStore<ZTransformComponent>& zTransforms,
-        ComponentStore<DamageTextComponent>& damageTexts,  // ← 新增：伤害飘字
-        ComponentStore<LifetimeComponent>& lifetimes,      // ← 新增：生命周期
-        ECS& ecs)
+        ComponentStore<DamageTextComponent>& damageTexts,
+        ComponentStore<LifetimeComponent>& lifetimes,
+        ECS& ecs,
+        GameJuice& juice)  // ← 打击感状态器
     {
         auto entities = damageEvents.entityList();
         for (Entity eventEntity : entities) {
@@ -82,7 +96,7 @@ public:
                 Entity textEntity = ecs.create();
                 
                 // 位置稍微向上偏移，带有轻微的随机数防止多个数字重叠
-                float randomOffsetX = (static_cast<float>(std::rand()) / RAND_MAX) * 20.0f - 10.0f;
+                float randomOffsetX = (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 20.0f - 10.0f;
                 
                 transforms.add(textEntity, {
                     .position = {event.hitPosition.x + randomOffsetX, event.hitPosition.y - 40.0f},
@@ -148,6 +162,23 @@ public:
                         zTrans.vz = event.knockbackZ;
                         zTrans.z += 5.0f;  // 强行拉离地面，防止立即判定落地
                     }
+                }
+                
+                // ← 【GameJuice】打击感触发：根据伤害/击飞力度赋予不同级别的反馈
+                if (event.knockbackXY > 1000.0f) {
+                    // 核弹级打击感（炸弹爆炸、重击）
+                    juice.hitStopTimer = 0.12f;      // 画面停滞 0.12 秒（夸张卡肉）
+                    juice.timeScale = 0.0f;
+                    juice.shakeTimer = 0.3f;          // 震动持续 0.3 秒
+                    juice.shakeIntensity = 20.0f;     // 屏幕狂震 20 像素
+                    std::cout << "[GameJuice] 💥 HEAVY hit-stop + shake!\n";
+                } else if (event.actualDamage > 0) {
+                    // 普通级打击感（剑气平 A）
+                    juice.hitStopTimer = 0.04f;       // 停滞 2-3 帧
+                    juice.timeScale = 0.0f;
+                    juice.shakeTimer = 0.1f;
+                    juice.shakeIntensity = 5.0f;      // 轻微震动
+                    std::cout << "[GameJuice] ⚡ Light hit-stop + shake!\n";
                 }
             }
             

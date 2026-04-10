@@ -594,6 +594,9 @@ int main() {
     sf::Time timeSinceLastUpdate = sf::Time::Zero;
     sf::Clock clock, debugClock;
     
+    // ========== GameJuice 全局打击感状态器 ==========
+    GameJuice juice;
+    
     // ========== 输入管理器初始化 ==========
     InputManager inputManager;
     
@@ -640,8 +643,23 @@ int main() {
     float respawnTimer = 0.0f;
     
     while (window.isOpen()) {
-        sf::Time dtTime = clock.restart();
-        timeSinceLastUpdate += dtTime;
+        // ========== 时间法则：接管游戏时间流速 ==========
+        float realDt = clock.restart().asSeconds();
+        
+        // 1. 更新顿帧 (Hit-Stop) 逻辑
+        if (juice.hitStopTimer > 0.0f) {
+            juice.hitStopTimer -= realDt;  // 必须用真实时间流逝
+            if (juice.hitStopTimer <= 0.0f) {
+                juice.timeScale = 1.0f;    // 时间恢复流动！
+                juice.hitStopTimer = 0.0f;
+            } else {
+                juice.timeScale = 0.0f;    // 时间绝对静止！
+            }
+        }
+        
+        // 2. 游戏物理逻辑时间 (gameDt) 受到 timeScale 影响
+        float gameDt = realDt * juice.timeScale;
+        timeSinceLastUpdate += sf::seconds(gameDt);  // 顿帧时不累加，固定步长不会执行！
         
         while (const auto event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) window.close();
@@ -817,7 +835,7 @@ int main() {
         
         static float bombCooldown = 0.0f;
         if (bombCooldown > 0.0f) {
-            bombCooldown -= dtTime.asSeconds();
+            bombCooldown -= realDt;
         }
         
         if (bombPressed && !lastBombPressed && bombCooldown <= 0.0f) {
@@ -885,7 +903,7 @@ int main() {
         // --- 神圣的 Fixed Timestep 物理循环 ---
         while (timeSinceLastUpdate >= TIME_PER_FRAME) {
             timeSinceLastUpdate -= TIME_PER_FRAME;
-            float fixedDt = TIME_PER_FRAME.asSeconds() * timeScale;
+            float fixedDt = TIME_PER_FRAME.asSeconds();  // timeScale 已通过 gameDt 控制
             
             if (frameStep) {
                 frameStep = false;
@@ -930,7 +948,7 @@ int main() {
             attachmentSystem.update(attachedComponents, transforms, zTransforms, fixedDt);
             attackSystem.update(states, attackStates, transforms, characters, ecs, hitboxes, lifetimes, attachedComponents, zTransforms, fixedDt);
             collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, zTransforms, damageEvents, ecs, fixedDt);
-            damageSystem.update(characters, damageEvents, deathTags, states, dashes, transforms, zTransforms, damageTexts, lifetimes, ecs);
+            damageSystem.update(characters, damageEvents, deathTags, states, dashes, transforms, zTransforms, damageTexts, lifetimes, ecs, juice);
             lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
             deathSystem.update(states, transforms, characters, hurtboxes, lootDrops, inputs, deathTags, ecs, evolutions, fixedDt);
             pickupSystem.update(ecs, evolutions, transforms, transforms, itemDatas, pickupBoxes, magnets);
@@ -962,6 +980,25 @@ int main() {
         
         // --- 循环外：纯渲染 ---
         window.clear(COLOR_BACKGROUND);
+        
+        // ========== 空间法则：Camera Shake 屏幕震动 ==========
+        sf::View view = window.getDefaultView();
+        
+        if (juice.shakeTimer > 0.0f) {
+            juice.shakeTimer -= realDt;  // 震动不受游戏时间静止影响
+            
+            // 生成随机偏移 (-intensity 到 +intensity)
+            float offsetX = ((std::rand() % 200) / 100.0f - 1.0f) * juice.shakeIntensity;
+            float offsetY = ((std::rand() % 200) / 100.0f - 1.0f) * juice.shakeIntensity;
+            
+            view.move(sf::Vector2f{offsetX, offsetY});
+            
+            // 震动强度快速衰减（让震动有爆发感）
+            juice.shakeIntensity *= 0.9f;
+        }
+        
+        window.setView(view);
+        
         renderGrid(window);
         
         std::vector<Entity> renderOrder;
@@ -987,6 +1024,9 @@ int main() {
         renderLoot(window, transforms, itemDatas);
         renderBombs(window, transforms, bombs, zTransforms);
         damageTextRenderSystem.update(damageTexts, window, font, ecs, TIME_PER_FRAME.asSeconds());
+        
+        // 恢复默认视图，防止 UI 和提示文字也跟着震动！
+        window.setView(window.getDefaultView());
         
         // ========== UI 帮助面板渲染（动态菜单）==========
         if (showHelpUI) {
@@ -1052,7 +1092,9 @@ int main() {
                       << " | State: " << stateToString(states.get(player).currentState)
                       << " | Z-Height: " << playerZ
                       << " | Loots: " << itemDatas.entityList().size()
-                      << " | TimeScale: " << timeScale << "\n";
+                      << " | Juice: timeScale=" << juice.timeScale 
+                      << " shake=" << juice.shakeIntensity 
+                      << " hitStop=" << juice.hitStopTimer << "\n";
             debugClock.restart();
         }
     }
