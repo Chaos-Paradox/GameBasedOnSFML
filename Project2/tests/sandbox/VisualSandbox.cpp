@@ -777,16 +777,16 @@ int main() {
             }
             lastFrameStepPressed = currentFrameStepPressed;
             
-            // 生成假人输入（使用输入映射系统，支持动态改键）
-            bool spawnDummyPressed = isActionPressed(inputManager, GameAction::SpawnDummy);
-            static bool lastSpawnDummyPressed = false;
-            if (spawnDummyPressed && !lastSpawnDummyPressed) {
-                sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-                sf::Vector2f worldPos = window.mapPixelToCoords(mousePos);
-                createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, colliders, worldPos.x, worldPos.y);
-                std::cout << "Dummy created at (" << worldPos.x << ", " << worldPos.y << ")\n";
+            // 生成假人输入 — 必须用事件驱动，不能用 isActionPressed 实时检测
+            // （放在 pollEvent 循环内才能可靠捕获鼠标点击事件）
+            if (const auto* mb = event->getIf<sf::Event::MouseButtonPressed>()) {
+                if (inputManager.getMappedKey(GameAction::SpawnDummy) == EngineKey::MouseRight
+                    && mb->button == sf::Mouse::Button::Right) {
+                    sf::Vector2f worldPos = window.mapPixelToCoords(mb->position);
+                    createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, colliders, worldPos.x, worldPos.y);
+                    std::cout << "[SpawnDummy] 🎯 Dummy created at (" << worldPos.x << ", " << worldPos.y << ")\n";
+                }
             }
-            lastSpawnDummyPressed = spawnDummyPressed;
         }
         
         // --- 循环外：抓取瞬时输入（使用输入映射系统）---
