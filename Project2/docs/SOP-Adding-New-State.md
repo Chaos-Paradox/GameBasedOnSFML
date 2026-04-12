@@ -87,7 +87,7 @@ enum class StateType {
 #### 7. 运行所有测试
 
 ```bash
-cd /Users/pioneer/.openclaw/workspace/SFMLGame/Project2
+cd <项目根目录>/Project2
 ./test/run_all_tests.sh
 ```
 

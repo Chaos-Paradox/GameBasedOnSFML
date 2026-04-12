@@ -3,7 +3,7 @@
 ## 🚀 运行沙盒测试
 
 ```bash
-cd /Users/pioneer/.openclaw/workspace/SFMLGame/Project2
+cd <项目根目录>/Project2
 
 # 编译（启用 SFML）
 cmake -S . -B build -DENABLE_SFML=ON

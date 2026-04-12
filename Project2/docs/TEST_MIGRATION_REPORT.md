@@ -175,7 +175,7 @@ characters.add(p1, {.currentHP = 100, .baseAttack = 10});
 ### 编译测试
 
 ```bash
-cd /Users/pioneer/.openclaw/workspace/SFMLGame
+cd <项目根目录>
 cmake --build build --target state_machine_test
 cmake --build build --target collision_test
 cmake --build build --target hurt_dead_state_test

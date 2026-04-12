@@ -220,7 +220,7 @@ L3_INVINCIBLE_INTERCEPT_TEST(ecs, characters, states, damageTags, stateSystem)
 ### 运行测试
 
 ```bash
-cd /Users/pioneer/.openclaw/workspace/SFMLGame
+cd <项目根目录>
 cmake --build build --target test_architecture
 ./build/bin/test_architecture
 ```

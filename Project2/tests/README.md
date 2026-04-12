@@ -38,7 +38,7 @@ tests/
 
 **编译和运行：**
 ```bash
-cd /Users/pioneer/.openclaw/workspace/SFMLGame/Project2
+cd <项目根目录>/Project2
 
 # 编译所有单元测试
 cmake --build build --target movement_pipeline_test
@@ -67,7 +67,7 @@ cmake --build build --target attack_test
 
 **编译和运行：**
 ```bash
-cd /Users/pioneer/.openclaw/workspace/SFMLGame/Project2
+cd <项目根目录>/Project2
 
 # 启用 SFML 并编译
 cmake -S . -B build -DENABLE_SFML=ON

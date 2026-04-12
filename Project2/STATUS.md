@@ -196,7 +196,7 @@
 
 ```bash
 # 运行所有测试
-cd /Users/pioneer/.openclaw/workspace/SFMLGame
+cd <项目根目录>
 ./Project2/test/run_all_tests.sh
 
 # 运行单个测试
