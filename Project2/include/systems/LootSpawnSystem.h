@@ -1,101 +1,63 @@
 #pragma once
-#include "../core/Component.h"
-#include "../core/ECS.h"
-#include "../components/Transform.h"
-#include "../components/LootDrop.h"
-#include "../components/ItemData.h"
-#include "../components/PickupBox.h"
-#include "../components/MagnetComponent.h"
-#include "../components/DeathTag.h"
+#include "core/GameWorld.h"
 #include <cstdlib>
 
 /**
  * @brief 掉落生成系统
- * 
- * 职责：
- * - 监听拥有 LootDropComponent + DeathTag 的实体（刚死亡的怪物）
- * - 读取怪物的最后坐标
- * - 触发随机数判定 dropChance
- * - 生成掉落物实体（Transform + ItemData + PickupBox）
- * 
- * ⚠️ 时序安全：必须在 DeathSystem 之前执行！
- * 因为一旦 DeathSystem 执行了 ecs.destroy()，怪物的坐标就消失了。
  */
 class LootSpawnSystem {
 public:
-    void update(
-        ComponentStore<TransformComponent>& transforms,
-        ComponentStore<LootDropComponent>& lootDrops,
-        ComponentStore<ItemDataComponent>& itemDatas,
-        ComponentStore<PickupBoxComponent>& pickupBoxes,
-        const ComponentStore<DeathTag>& deathTags,
-        ECS& ecs)
+    void update(GameWorld& world, float dt)
     {
-        auto entities = deathTags.entityList();
+        (void)dt;
+
+        auto entities = world.deathTags.entityList();
         for (Entity entity : entities) {
-            // 安全检查：必须有 LootDropComponent 和 TransformComponent
-            if (!lootDrops.has(entity) || !transforms.has(entity)) {
-                continue;
-            }
-            
-            const auto& lootDrop = lootDrops.get(entity);
-            const auto& transform = transforms.get(entity);
-            
-            // 如果已经掉落过，跳过（防抖锁）
-            if (lootDrop.hasDropped) {
-                continue;
-            }
-            
-            // 遍历掉落表
+            if (!world.lootDrops.has(entity) || !world.transforms.has(entity)) continue;
+
+            const auto& lootDrop = world.lootDrops.get(entity);
+            const auto& transform = world.transforms.get(entity);
+
+            if (lootDrop.hasDropped) continue;
+
             for (int i = 0; i < lootDrop.lootCount; i++) {
                 const auto& entry = lootDrop.lootTable[i];
-                
-                // 随机数判定（0-1）
                 float rand = static_cast<float>(std::rand()) / RAND_MAX;
-                
+
                 if (rand <= entry.dropChance) {
-                    // 【修复】生成掉落物实体
-                    Entity lootEntity = ecs.create();
-                    
-                    // 【修复】添加随机抖动 (±20 像素)
+                    Entity lootEntity = world.ecs.create();
+
                     float jitterX = (static_cast<float>(std::rand()) / RAND_MAX) * 40.0f - 20.0f;
                     float jitterY = (static_cast<float>(std::rand()) / RAND_MAX) * 40.0f - 20.0f;
-                    
-                    // 【修复】Transform：必须使用死者的 position + 抖动！
-                    transforms.add(lootEntity, {
+
+                    world.transforms.add(lootEntity, {
                         .position = {transform.position.x + jitterX, transform.position.y + jitterY},
                         .scale = {1.0f, 1.0f},
                         .rotation = 0.0f,
-                        // ← 新增：爆米花抛射效果（更快的初速度）
                         .velocity = {
-                            (static_cast<float>(std::rand()) / RAND_MAX) * 120.0f - 60.0f,  // x: -60 ~ 60
-                            (static_cast<float>(std::rand()) / RAND_MAX) * -120.0f - 80.0f  // y: -200 ~ -80 (向上更快)
+                            (static_cast<float>(std::rand()) / RAND_MAX) * 120.0f - 60.0f,
+                            (static_cast<float>(std::rand()) / RAND_MAX) * -120.0f - 80.0f
                         }
                     });
-                    
-                    // 【修复】ItemData：物品数据
+
                     int amount = entry.minCount;
                     if (entry.maxCount > entry.minCount) {
                         amount += std::rand() % (entry.maxCount - entry.minCount + 1);
                     }
-                    
-                    itemDatas.add(lootEntity, {
+
+                    world.itemDatas.add(lootEntity, {
                         .itemId = entry.itemId,
                         .amount = amount,
                         .isPickupable = true
                     });
-                    
-                    // 【修复】PickupBox：拾取碰撞框
-                    pickupBoxes.add(lootEntity, {
+
+                    world.pickupBoxes.add(lootEntity, {
                         .width = 20.0f,
                         .height = 20.0f
                     });
-                    
-                    // ← 不再给掉落物添加 MagnetComponent（现在 MagnetComponent 在玩家身上）
                 }
             }
-            
-            // 【修复】标记已掉落（防止重复）
+
             LootDropComponent& mutableLootDrop = const_cast<LootDropComponent&>(lootDrop);
             mutableLootDrop.hasDropped = true;
         }

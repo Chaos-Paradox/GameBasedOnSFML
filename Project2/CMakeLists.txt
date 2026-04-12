@@ -18,6 +18,7 @@ add_library(${PROJECT_NAME} STATIC ${SRC_FILES})
 # 可选：链接 SFML
 if(ENABLE_SFML)
     message(STATUS "SFML rendering backend enabled")
+    target_compile_definitions(${PROJECT_NAME} PUBLIC ENABLE_SFML)
     
     if(APPLE)
         find_package(SFML 3 COMPONENTS Graphics Audio Window System REQUIRED)

@@ -1,8 +1,10 @@
 /**
  * @file VisualSandbox.cpp
  * @brief 可视化调试沙盒 - 战斗管线测试（含冲刺与战利品系统）
- * 
- * 输入系统：使用 InputManager 进行平台无关的按键绑定
+ *
+ * ✅ ECS 架构大清洗：GameWorld 注册表模式
+ * ✅ 双玩家改键：InputManager 挂载到 GameWorld
+ * ✅ ImGui 集成 + 双轨制混合输入（P1 字典映射 + P2 原生摇杆）
  */
 
 #include <SFML/Graphics.hpp>
@@ -14,38 +16,73 @@
 #include <algorithm>
 #include <unordered_map>
 
-// ========== 核心输入管理器（平台无关层）==========
+// ========== ImGui ==========
+#include "imgui.h"
+#include "imgui-SFML.h"
+#include <filesystem>
+
+// ========== 核心输入管理器 ==========
 #include "core/InputManager.h"
 
-// ========== 平台适配器：引擎键 <-> SFML 键双向翻译 ==========
+// ========== GameWorld ==========
+#include "core/GameWorld.h"
 
-/**
- * @brief 将引擎键翻译为 SFML 键（用于实时状态查询）
- */
+// ========== 所有系统 ==========
+#include "systems/StateMachineSystem.h"
+#include "systems/LocomotionSystem.h"
+#include "systems/MovementSystem.h"
+#include "systems/AttackSystem.h"
+#include "systems/CollisionSystem.h"
+#include "systems/DamageSystem.h"
+#include "systems/DeathSystem.h"
+#include "systems/LootSpawnSystem.h"
+#include "systems/PickupSystem.h"
+#include "systems/MagnetSystem.h"
+#include "systems/CleanupSystem.h"
+#include "systems/DebugSystem.h"
+#include "systems/DashSystem.h"
+#include "systems/PhysicalCollisionSystem.h"
+#include "systems/AttachmentSystem.h"
+#include "systems/BombSystem.h"
+#include "systems/DamageTextSpawnerSystem.h"
+#include "systems/DamageTextRenderSystem.h"
+#include "systems/RenderSystem.h"
+
+// ========== 平台适配器 ==========
+
 sf::Keyboard::Key toSFMLKey(EngineKey eKey) {
     switch(eKey) {
-        case EngineKey::W: return sf::Keyboard::Key::W;
+        // 26 个字母键
         case EngineKey::A: return sf::Keyboard::Key::A;
-        case EngineKey::S: return sf::Keyboard::Key::S;
+        case EngineKey::B: return sf::Keyboard::Key::B;
+        case EngineKey::C: return sf::Keyboard::Key::C;
         case EngineKey::D: return sf::Keyboard::Key::D;
-        case EngineKey::Space: return sf::Keyboard::Key::Space;
-        case EngineKey::Escape: return sf::Keyboard::Key::Escape;
-        case EngineKey::J: return sf::Keyboard::Key::J;
-        case EngineKey::K: return sf::Keyboard::Key::K;
-        case EngineKey::G: return sf::Keyboard::Key::G;
-        case EngineKey::T: return sf::Keyboard::Key::T;
-        case EngineKey::H: return sf::Keyboard::Key::H;
-        case EngineKey::L: return sf::Keyboard::Key::L;
-        case EngineKey::Q: return sf::Keyboard::Key::Q;
-        case EngineKey::R: return sf::Keyboard::Key::R;
         case EngineKey::E: return sf::Keyboard::Key::E;
         case EngineKey::F: return sf::Keyboard::Key::F;
-        case EngineKey::P: return sf::Keyboard::Key::P;
-        case EngineKey::O: return sf::Keyboard::Key::O;
+        case EngineKey::G: return sf::Keyboard::Key::G;
+        case EngineKey::H: return sf::Keyboard::Key::H;
         case EngineKey::I: return sf::Keyboard::Key::I;
+        case EngineKey::J: return sf::Keyboard::Key::J;
+        case EngineKey::K: return sf::Keyboard::Key::K;
+        case EngineKey::L: return sf::Keyboard::Key::L;
+        case EngineKey::M: return sf::Keyboard::Key::M;
+        case EngineKey::N: return sf::Keyboard::Key::N;
+        case EngineKey::O: return sf::Keyboard::Key::O;
+        case EngineKey::P: return sf::Keyboard::Key::P;
+        case EngineKey::Q: return sf::Keyboard::Key::Q;
+        case EngineKey::R: return sf::Keyboard::Key::R;
+        case EngineKey::S: return sf::Keyboard::Key::S;
+        case EngineKey::T: return sf::Keyboard::Key::T;
         case EngineKey::U: return sf::Keyboard::Key::U;
-        case EngineKey::Y: return sf::Keyboard::Key::Y;
+        case EngineKey::V: return sf::Keyboard::Key::V;
+        case EngineKey::W: return sf::Keyboard::Key::W;
         case EngineKey::X: return sf::Keyboard::Key::X;
+        case EngineKey::Y: return sf::Keyboard::Key::Y;
+        case EngineKey::Z: return sf::Keyboard::Key::Z;
+        // 功能/修饰键
+        case EngineKey::Space: return sf::Keyboard::Key::Space;
+        case EngineKey::Escape: return sf::Keyboard::Key::Escape;
+        case EngineKey::Backspace: return sf::Keyboard::Key::Backspace;
         case EngineKey::F1: return sf::Keyboard::Key::F1;
         case EngineKey::F2: return sf::Keyboard::Key::F2;
         case EngineKey::F3: return sf::Keyboard::Key::F3;
@@ -65,12 +102,7 @@ sf::Keyboard::Key toSFMLKey(EngineKey eKey) {
         case EngineKey::RightCtrl: return sf::Keyboard::Key::RControl;
         case EngineKey::LeftAlt: return sf::Keyboard::Key::LAlt;
         case EngineKey::RightAlt: return sf::Keyboard::Key::RAlt;
-        case EngineKey::Z: return sf::Keyboard::Key::Z;
-        case EngineKey::C: return sf::Keyboard::Key::C;
-        case EngineKey::V: return sf::Keyboard::Key::V;
-        case EngineKey::B: return sf::Keyboard::Key::B;
-        case EngineKey::N: return sf::Keyboard::Key::N;
-        case EngineKey::M: return sf::Keyboard::Key::M;
+        // 标点/符号键
         case EngineKey::Comma: return sf::Keyboard::Key::Comma;
         case EngineKey::Period: return sf::Keyboard::Key::Period;
         case EngineKey::Slash: return sf::Keyboard::Key::Slash;
@@ -82,16 +114,19 @@ sf::Keyboard::Key toSFMLKey(EngineKey eKey) {
         case EngineKey::Minus: return sf::Keyboard::Key::Hyphen;
         case EngineKey::Equal: return sf::Keyboard::Key::Equal;
         case EngineKey::Backquote: return sf::Keyboard::Key::Grave;
+        // 编辑键
         case EngineKey::Delete: return sf::Keyboard::Key::Delete;
         case EngineKey::Insert: return sf::Keyboard::Key::Insert;
         case EngineKey::Home: return sf::Keyboard::Key::Home;
         case EngineKey::End: return sf::Keyboard::Key::End;
         case EngineKey::PageUp: return sf::Keyboard::Key::PageUp;
         case EngineKey::PageDown: return sf::Keyboard::Key::PageDown;
+        // 方向键
         case EngineKey::Up: return sf::Keyboard::Key::Up;
         case EngineKey::Down: return sf::Keyboard::Key::Down;
         case EngineKey::Left: return sf::Keyboard::Key::Left;
         case EngineKey::Right: return sf::Keyboard::Key::Right;
+        // 小键盘
         case EngineKey::Num0: return sf::Keyboard::Key::Numpad0;
         case EngineKey::Num1: return sf::Keyboard::Key::Numpad1;
         case EngineKey::Num2: return sf::Keyboard::Key::Numpad2;
@@ -102,7 +137,7 @@ sf::Keyboard::Key toSFMLKey(EngineKey eKey) {
         case EngineKey::Num7: return sf::Keyboard::Key::Numpad7;
         case EngineKey::Num8: return sf::Keyboard::Key::Numpad8;
         case EngineKey::Num9: return sf::Keyboard::Key::Numpad9;
-        // 鼠标按键（通过特殊值标识，实际查询用 isMouseButtonPressed）
+        // 鼠标键（无对应键盘键）
         case EngineKey::MouseLeft: return sf::Keyboard::Key::Unknown;
         case EngineKey::MouseRight: return sf::Keyboard::Key::Unknown;
         case EngineKey::MouseMiddle: return sf::Keyboard::Key::Unknown;
@@ -112,79 +147,95 @@ sf::Keyboard::Key toSFMLKey(EngineKey eKey) {
     }
 }
 
-/**
- * @brief 将 SFML 键翻译为引擎键（用于捕获改键输入）
- */
 EngineKey toEngineKey(sf::Keyboard::Key sfKey) {
     switch(sfKey) {
-        case sf::Keyboard::Key::W: return EngineKey::W;
+        // 26 个字母键
         case sf::Keyboard::Key::A: return EngineKey::A;
-        case sf::Keyboard::Key::S: return EngineKey::S;
+        case sf::Keyboard::Key::B: return EngineKey::B;
+        case sf::Keyboard::Key::C: return EngineKey::C;
         case sf::Keyboard::Key::D: return EngineKey::D;
-        case sf::Keyboard::Key::Space: return EngineKey::Space;
-        case sf::Keyboard::Key::Escape: return EngineKey::Escape;
-        case sf::Keyboard::Key::J: return EngineKey::J;
-        case sf::Keyboard::Key::K: return EngineKey::K;
-        case sf::Keyboard::Key::G: return EngineKey::G;
-        case sf::Keyboard::Key::T: return EngineKey::T;
-        case sf::Keyboard::Key::H: return EngineKey::H;
-        case sf::Keyboard::Key::L: return EngineKey::L;
-        case sf::Keyboard::Key::Q: return EngineKey::Q;
-        case sf::Keyboard::Key::R: return EngineKey::R;
         case sf::Keyboard::Key::E: return EngineKey::E;
         case sf::Keyboard::Key::F: return EngineKey::F;
-        case sf::Keyboard::Key::P: return EngineKey::P;
-        case sf::Keyboard::Key::O: return EngineKey::O;
+        case sf::Keyboard::Key::G: return EngineKey::G;
+        case sf::Keyboard::Key::H: return EngineKey::H;
         case sf::Keyboard::Key::I: return EngineKey::I;
+        case sf::Keyboard::Key::J: return EngineKey::J;
+        case sf::Keyboard::Key::K: return EngineKey::K;
+        case sf::Keyboard::Key::L: return EngineKey::L;
+        case sf::Keyboard::Key::M: return EngineKey::M;
+        case sf::Keyboard::Key::N: return EngineKey::N;
+        case sf::Keyboard::Key::O: return EngineKey::O;
+        case sf::Keyboard::Key::P: return EngineKey::P;
+        case sf::Keyboard::Key::Q: return EngineKey::Q;
+        case sf::Keyboard::Key::R: return EngineKey::R;
+        case sf::Keyboard::Key::S: return EngineKey::S;
+        case sf::Keyboard::Key::T: return EngineKey::T;
         case sf::Keyboard::Key::U: return EngineKey::U;
+        case sf::Keyboard::Key::V: return EngineKey::V;
+        case sf::Keyboard::Key::W: return EngineKey::W;
+        case sf::Keyboard::Key::X: return EngineKey::X;
         case sf::Keyboard::Key::Y: return EngineKey::Y;
-        case sf::Keyboard::Key::F1: return EngineKey::F1;
-        case sf::Keyboard::Key::F2: return EngineKey::F2;
-        case sf::Keyboard::Key::F3: return EngineKey::F3;
-        case sf::Keyboard::Key::F4: return EngineKey::F4;
-        case sf::Keyboard::Key::F5: return EngineKey::F5;
-        case sf::Keyboard::Key::F6: return EngineKey::F6;
-        case sf::Keyboard::Key::F7: return EngineKey::F7;
-        case sf::Keyboard::Key::F8: return EngineKey::F8;
-        case sf::Keyboard::Key::F9: return EngineKey::F9;
+        case sf::Keyboard::Key::Z: return EngineKey::Z;
+        // 数字键
+        case sf::Keyboard::Key::Num0: return EngineKey::Num0;
+        case sf::Keyboard::Key::Num1: return EngineKey::Num1;
+        case sf::Keyboard::Key::Num2: return EngineKey::Num2;
+        case sf::Keyboard::Key::Num3: return EngineKey::Num3;
+        case sf::Keyboard::Key::Num4: return EngineKey::Num4;
+        case sf::Keyboard::Key::Num5: return EngineKey::Num5;
+        case sf::Keyboard::Key::Num6: return EngineKey::Num6;
+        case sf::Keyboard::Key::Num7: return EngineKey::Num7;
+        case sf::Keyboard::Key::Num8: return EngineKey::Num8;
+        case sf::Keyboard::Key::Num9: return EngineKey::Num9;
+        // 功能键
+        case sf::Keyboard::Key::F1:  return EngineKey::F1;
+        case sf::Keyboard::Key::F2:  return EngineKey::F2;
+        case sf::Keyboard::Key::F3:  return EngineKey::F3;
+        case sf::Keyboard::Key::F4:  return EngineKey::F4;
+        case sf::Keyboard::Key::F5:  return EngineKey::F5;
+        case sf::Keyboard::Key::F6:  return EngineKey::F6;
+        case sf::Keyboard::Key::F7:  return EngineKey::F7;
+        case sf::Keyboard::Key::F8:  return EngineKey::F8;
+        case sf::Keyboard::Key::F9:  return EngineKey::F9;
         case sf::Keyboard::Key::F10: return EngineKey::F10;
         case sf::Keyboard::Key::F11: return EngineKey::F11;
         case sf::Keyboard::Key::F12: return EngineKey::F12;
-        case sf::Keyboard::Key::Enter: return EngineKey::Enter;
-        case sf::Keyboard::Key::LShift: return EngineKey::LeftShift;
-        case sf::Keyboard::Key::RShift: return EngineKey::RightShift;
-        case sf::Keyboard::Key::LControl: return EngineKey::LeftCtrl;
-        case sf::Keyboard::Key::RControl: return EngineKey::RightCtrl;
-        case sf::Keyboard::Key::LAlt: return EngineKey::LeftAlt;
-        case sf::Keyboard::Key::RAlt: return EngineKey::RightAlt;
-        case sf::Keyboard::Key::Z: return EngineKey::Z;
-        case sf::Keyboard::Key::X: return EngineKey::X;
-        case sf::Keyboard::Key::C: return EngineKey::C;
-        case sf::Keyboard::Key::V: return EngineKey::V;
-        case sf::Keyboard::Key::B: return EngineKey::B;
-        case sf::Keyboard::Key::N: return EngineKey::N;
-        case sf::Keyboard::Key::M: return EngineKey::M;
-        case sf::Keyboard::Key::Comma: return EngineKey::Comma;
-        case sf::Keyboard::Key::Period: return EngineKey::Period;
-        case sf::Keyboard::Key::Slash: return EngineKey::Slash;
-        case sf::Keyboard::Key::Semicolon: return EngineKey::SemiColon;
-        case sf::Keyboard::Key::Apostrophe: return EngineKey::Quote;
-        case sf::Keyboard::Key::LBracket: return EngineKey::LeftBracket;
-        case sf::Keyboard::Key::RBracket: return EngineKey::RightBracket;
-        case sf::Keyboard::Key::Backslash: return EngineKey::Backslash;
-        case sf::Keyboard::Key::Hyphen: return EngineKey::Minus;
-        case sf::Keyboard::Key::Equal: return EngineKey::Equal;
-        case sf::Keyboard::Key::Grave: return EngineKey::Backquote;
-        case sf::Keyboard::Key::Delete: return EngineKey::Delete;
-        case sf::Keyboard::Key::Insert: return EngineKey::Insert;
-        case sf::Keyboard::Key::Home: return EngineKey::Home;
-        case sf::Keyboard::Key::End: return EngineKey::End;
-        case sf::Keyboard::Key::PageUp: return EngineKey::PageUp;
-        case sf::Keyboard::Key::PageDown: return EngineKey::PageDown;
-        case sf::Keyboard::Key::Up: return EngineKey::Up;
-        case sf::Keyboard::Key::Down: return EngineKey::Down;
-        case sf::Keyboard::Key::Left: return EngineKey::Left;
+        // 修饰键
+        case sf::Keyboard::Key::Space:     return EngineKey::Space;
+        case sf::Keyboard::Key::Escape:    return EngineKey::Escape;
+        case sf::Keyboard::Key::Backspace: return EngineKey::Backspace;
+        case sf::Keyboard::Key::Enter:     return EngineKey::Enter;
+        case sf::Keyboard::Key::LShift:    return EngineKey::LeftShift;
+        case sf::Keyboard::Key::RShift:    return EngineKey::RightShift;
+        case sf::Keyboard::Key::LControl:  return EngineKey::LeftCtrl;
+        case sf::Keyboard::Key::RControl:  return EngineKey::RightCtrl;
+        case sf::Keyboard::Key::LAlt:      return EngineKey::LeftAlt;
+        case sf::Keyboard::Key::RAlt:      return EngineKey::RightAlt;
+        // 方向键
+        case sf::Keyboard::Key::Up:    return EngineKey::Up;
+        case sf::Keyboard::Key::Down:  return EngineKey::Down;
+        case sf::Keyboard::Key::Left:  return EngineKey::Left;
         case sf::Keyboard::Key::Right: return EngineKey::Right;
+        // 标点/符号键
+        case sf::Keyboard::Key::Comma:      return EngineKey::Comma;
+        case sf::Keyboard::Key::Period:     return EngineKey::Period;
+        case sf::Keyboard::Key::Slash:      return EngineKey::Slash;
+        case sf::Keyboard::Key::Semicolon:  return EngineKey::SemiColon;
+        case sf::Keyboard::Key::Apostrophe: return EngineKey::Quote;
+        case sf::Keyboard::Key::LBracket:   return EngineKey::LeftBracket;
+        case sf::Keyboard::Key::RBracket:   return EngineKey::RightBracket;
+        case sf::Keyboard::Key::Backslash:  return EngineKey::Backslash;
+        case sf::Keyboard::Key::Hyphen:     return EngineKey::Minus;
+        case sf::Keyboard::Key::Equal:      return EngineKey::Equal;
+        case sf::Keyboard::Key::Grave:      return EngineKey::Backquote;
+        // 编辑键
+        case sf::Keyboard::Key::Delete:  return EngineKey::Delete;
+        case sf::Keyboard::Key::Insert:  return EngineKey::Insert;
+        case sf::Keyboard::Key::Home:    return EngineKey::Home;
+        case sf::Keyboard::Key::End:     return EngineKey::End;
+        case sf::Keyboard::Key::PageUp:  return EngineKey::PageUp;
+        case sf::Keyboard::Key::PageDown:return EngineKey::PageDown;
+        // 小键盘
         case sf::Keyboard::Key::Numpad0: return EngineKey::Num0;
         case sf::Keyboard::Key::Numpad1: return EngineKey::Num1;
         case sf::Keyboard::Key::Numpad2: return EngineKey::Num2;
@@ -199,83 +250,54 @@ EngineKey toEngineKey(sf::Keyboard::Key sfKey) {
     }
 }
 
-/**
- * @brief 将 SFML 鼠标键翻译为引擎键
- */
-EngineKey toEngineKey(sf::Mouse::Button mouseButton) {
-    switch(mouseButton) {
+EngineKey toEngineKey(sf::Mouse::Button mb) {
+    switch(mb) {
         case sf::Mouse::Button::Left: return EngineKey::MouseLeft;
         case sf::Mouse::Button::Right: return EngineKey::MouseRight;
         case sf::Mouse::Button::Middle: return EngineKey::MouseMiddle;
-        case sf::Mouse::Button::Extra1: return EngineKey::MouseX1;
-        case sf::Mouse::Button::Extra2: return EngineKey::MouseX2;
+        default: return EngineKey::Unknown;
+    }
+}
+
+EngineKey toEngineKey(unsigned int joystickBtn) {
+    switch(joystickBtn) {
+        case 0:  return EngineKey::JoyBtn0;   case 1:  return EngineKey::JoyBtn1;
+        case 2:  return EngineKey::JoyBtn2;   case 3:  return EngineKey::JoyBtn3;
+        case 4:  return EngineKey::JoyBtn4;   case 5:  return EngineKey::JoyBtn5;
+        case 6:  return EngineKey::JoyBtn6;   case 7:  return EngineKey::JoyBtn7;
+        case 8:  return EngineKey::JoyBtn8;   case 9:  return EngineKey::JoyBtn9;
+        case 10: return EngineKey::JoyBtn10;  case 11: return EngineKey::JoyBtn11;
+        case 12: return EngineKey::JoyBtn12;  case 13: return EngineKey::JoyBtn13;
+        case 14: return EngineKey::JoyBtn14;  case 15: return EngineKey::JoyBtn15;
         default: return EngineKey::Unknown;
     }
 }
 
 /**
- * @brief 基于 Action 的实时查询函数（供沙盒使用，支持键盘 + 鼠标）
+ * @brief 检查指定玩家的某个动作是否被按下（键盘 + 鼠标 + 手柄按钮）
  */
-bool isActionPressed(const InputManager& input, GameAction action) {
-    EngineKey eKey = input.getMappedKey(action);
-    
-    // 检查是否为鼠标按键
+bool isActionPressed(const InputManager& input, PlayerIndex player, GameAction action) {
+    EngineKey eKey = input.getMappedKey(player, action);
     if (eKey == EngineKey::MouseLeft) return sf::Mouse::isButtonPressed(sf::Mouse::Button::Left);
     if (eKey == EngineKey::MouseRight) return sf::Mouse::isButtonPressed(sf::Mouse::Button::Right);
     if (eKey == EngineKey::MouseMiddle) return sf::Mouse::isButtonPressed(sf::Mouse::Button::Middle);
-    if (eKey == EngineKey::MouseX1) return sf::Mouse::isButtonPressed(sf::Mouse::Button::Extra1);
-    if (eKey == EngineKey::MouseX2) return sf::Mouse::isButtonPressed(sf::Mouse::Button::Extra2);
-    
-    // 否则按键盘处理
+
+    // 手柄按钮检测：遍历所有已连接的手柄
+    if (static_cast<int>(eKey) >= static_cast<int>(EngineKey::JoyBtn0) &&
+        static_cast<int>(eKey) <= static_cast<int>(EngineKey::JoyBtn15)) {
+        int buttonIndex = static_cast<int>(eKey) - static_cast<int>(EngineKey::JoyBtn0);
+        for (unsigned int i = 0; i < sf::Joystick::Count; ++i) {
+            if (sf::Joystick::isConnected(i) && sf::Joystick::isButtonPressed(i, buttonIndex)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     return sf::Keyboard::isKeyPressed(toSFMLKey(eKey));
 }
 
-// ========== ECS 核心与组件 ==========
-#include "core/ECS.h"
-#include "core/Entity.h"
-#include "components/Transform.h"
-#include "components/StateMachine.h"
-#include "components/Character.h"
-#include "components/InputCommand.h"
-#include "components/Hurtbox.h"
-#include "components/Hitbox.h"
-#include "components/Lifetime.h"
-#include "components/DamageTag.h"
-#include "components/AttackState.h"
-#include "components/DeathTag.h"
-#include "components/LootDrop.h"
-#include "components/ItemData.h"
-#include "components/PickupBox.h"
-#include "components/Evolution.h"
-#include "components/MagnetComponent.h"
-#include "components/DashComponent.h"
-#include "components/DamageEventComponent.h"
-#include "components/ZTransformComponent.h"
-#include "components/ColliderComponent.h"
-#include "components/AttachedComponent.h"
-#include "components/BombComponent.h"
-#include "components/DeathTag.h"
-
-#include "systems/StateMachineSystem.h"
-#include "systems/LocomotionSystem.h"
-#include "systems/MovementSystem.h"
-#include "systems/AttackSystem.h"
-#include "systems/CollisionSystem.h"
-#include "systems/DamageSystem.h"
-#include "systems/DeathSystem.h"
-#include "systems/LootSpawnSystem.h"
-#include "systems/PickupSystem.h"
-#include "systems/MagnetSystem.h"
-#include "systems/CleanupSystem.h"
-#include "systems/DebugSystem.h"
-#include "systems/DashSystem.h"
-#include "systems/PhysicalCollisionSystem.h"
-#include "systems/AttachmentSystem.h"
-#include "systems/BombSystem.h"
-#include "systems/CleanupSystem.h"
-#include "systems/DamageTextSpawnerSystem.h"
-#include "systems/DamageTextRenderSystem.h"
-
+// ========== 渲染配置 ==========
 constexpr int WINDOW_WIDTH = 1024;
 constexpr int WINDOW_HEIGHT = 768;
 constexpr float ENTITY_SIZE = 40.0f;
@@ -284,8 +306,7 @@ sf::Color COLOR_PLAYER(50, 200, 50);
 sf::Color COLOR_ENEMY(200, 50, 50);
 sf::Color COLOR_HURT(255, 100, 100);
 sf::Color COLOR_DEAD(100, 100, 100);
-sf::Color COLOR_HITBOX(255, 255, 0, 128);
-sf::Color COLOR_LOOT(50, 255, 50); 
+sf::Color COLOR_LOOT(50, 255, 50);
 sf::Color COLOR_BACKGROUND(30, 30, 30);
 
 std::string stateToString(CharacterState state) {
@@ -300,269 +321,127 @@ std::string stateToString(CharacterState state) {
     }
 }
 
-/**
- * @brief 根据按键绑定获取移动输入（已归一化）
- */
-Vec2 getMappedInput(const InputManager& input) {
-    Vec2 dir{0.0f, 0.0f};
-    if (isActionPressed(input, GameAction::Up)) dir.y -= 1.0f;
-    if (isActionPressed(input, GameAction::Down)) dir.y += 1.0f;
-    if (isActionPressed(input, GameAction::Left)) dir.x -= 1.0f;
-    if (isActionPressed(input, GameAction::Right)) dir.x += 1.0f;
-    
-    // 向量归一化，防止斜向移动速度变成 1.414 倍
-    if (dir.x != 0.0f || dir.y != 0.0f) {
-        float length = std::sqrt(dir.x * dir.x + dir.y * dir.y);
-        if (length > 0.0f) {
-            dir.x /= length;
-            dir.y /= length;
-        }
-    }
-    
-    return dir;
-}
+// ========== 工厂函数 ==========
 
-auto createPlayer(ECS& ecs, ComponentStore<StateMachineComponent>& states, ComponentStore<TransformComponent>& transforms,
-                  ComponentStore<CharacterComponent>& characters, ComponentStore<InputCommand>& inputs,
-                  ComponentStore<HurtboxComponent>& hurtboxes, ComponentStore<EvolutionComponent>& evolutions,
-                  ComponentStore<DashComponent>& dashes, ComponentStore<MagnetComponent>& magnets,
-                  ComponentStore<ZTransformComponent>& zTransforms,
-                  ComponentStore<ColliderComponent>& colliders,
-                  float x, float y) {
-    auto player = ecs.create();
-    states.add(player, {CharacterState::Idle, CharacterState::Idle, 0.0f});
-    transforms.add(player, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, 1.0f, 0.0f});
-    characters.add(player, {"Player", 1, 100, 100, 10, 5, 200.0f, false, 0.0f, 1.0f, 0.0f});
-    inputs.add(player, {{0.0f, 0.0f}, ActionIntent::None, 0.0f});
-    hurtboxes.add(player, {20.0f, {0.0f, 0.0f}, Faction::Player, 1, 0.0f});
-    evolutions.add(player, {0, 0});
-    
-    dashes.add(player, {
-        .dashSpeed = 2000.0f, 
-        .dashDuration = 0.1f,
-        .iframeDuration = 0.1f,
-        .cooldown = 1.0f, 
-        .dashTimer = 0.0f, 
-        .cooldownTimer = 0.0f,
-        .iframeTimer = 0.0f,
-        .dashDir = {1.0f, 0.0f},
+auto createPlayer(GameWorld& world, float x, float y) {
+    auto player = world.ecs.create();
+    world.states.add(player, {CharacterState::Idle, CharacterState::Idle, 0.0f});
+    world.transforms.add(player, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, 1.0f, 0.0f});
+    world.characters.add(player, {"Player", 1, 100, 100, 10, 5, 200.0f, false, 0.0f, 1.0f, 0.0f});
+    world.inputs.add(player, {{0.0f, 0.0f}, ActionIntent::None, 0.0f});
+    world.hurtboxes.add(player, {
+        .radius = 18.0f, .height = 45.0f, .zOffset = 0.0f,
+        .offset = {0.0f, 0.0f}, .faction = Faction::Player,
+        .layer = 1, .invincibleTime = 0.0f
+    });
+    world.evolutions.add(player, {0, 0});
+    world.dashes.add(player, {
+        .dashSpeed = 2000.0f, .dashDuration = 0.1f,
+        .iframeDuration = 0.1f, .cooldown = 1.0f,
+        .dashTimer = 0.0f, .cooldownTimer = 0.0f,
+        .iframeTimer = 0.0f, .dashDir = {1.0f, 0.0f},
         .isInvincible = false
     });
-    
-    magnets.add(player, {
-        .magnetRadius = 150.0f,
-        .magnetSpeed = 400.0f
+    world.magnets.add(player, {
+        .magnetRadius = 150.0f, .magnetSpeed = 400.0f
     });
-    
-    zTransforms.add(player, {
-        .z = 0.0f,
-        .vz = 0.0f,
-        .gravity = -2000.0f,
-        .height = 40.0f
+    world.zTransforms.add(player, {
+        .z = 0.0f, .vz = 0.0f, .gravity = -2000.0f, .height = 40.0f
     });
-    
-    colliders.add(player, {
-        .radius = 20.0f,
-        .isStatic = false,
-        .mass = 100.0f
+    world.colliders.add(player, {
+        .radius = 20.0f, .isStatic = false, .mass = 100.0f
     });
-    
     return player;
 }
 
-auto createDummy(ECS& ecs, ComponentStore<StateMachineComponent>& states, ComponentStore<TransformComponent>& transforms,
-                 ComponentStore<CharacterComponent>& characters, ComponentStore<HurtboxComponent>& hurtboxes,
-                 ComponentStore<LootDropComponent>& lootDrops,
-                 ComponentStore<ColliderComponent>& colliders,
-                 float x, float y) {
-    auto dummy = ecs.create();
-    states.add(dummy, {CharacterState::Idle, CharacterState::Idle, 0.0f});
-    transforms.add(dummy, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, -1.0f, 0.0f});
-    characters.add(dummy, {"Dummy", 1, 100, 100, 10, 0, 0.0f, false, 0.0f, -1.0f, 0.0f});
-    hurtboxes.add(dummy, {20.0f, {0.0f, 0.0f}, Faction::Enemy, 2, 0.0f});
-    
+auto createDummy(GameWorld& world, float x, float y) {
+    auto dummy = world.ecs.create();
+    world.states.add(dummy, {CharacterState::Idle, CharacterState::Idle, 0.0f});
+    world.transforms.add(dummy, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, -1.0f, 0.0f});
+    world.characters.add(dummy, {"Dummy", 1, 100, 100, 10, 0, 0.0f, false, 0.0f, -1.0f, 0.0f});
+    world.hurtboxes.add(dummy, {
+        .radius = 18.0f, .height = 45.0f, .zOffset = 0.0f,
+        .offset = {0.0f, 0.0f}, .faction = Faction::Enemy,
+        .layer = 2, .invincibleTime = 0.0f
+    });
     LootDropComponent dummyLoot;
     dummyLoot.lootTable[0] = {1, 1.0f, 1, 1};
     dummyLoot.lootCount = 1;
     dummyLoot.hasDropped = false;
-    lootDrops.add(dummy, dummyLoot);
-    
-    colliders.add(dummy, {
-        .radius = 20.0f,
-        .isStatic = false,
-        .mass = 100.0f
+    world.lootDrops.add(dummy, dummyLoot);
+    world.colliders.add(dummy, {
+        .radius = 20.0f, .isStatic = false, .mass = 100.0f
     });
-    
+    world.zTransforms.add(dummy, {
+        .z = 0.0f, .vz = 0.0f, .gravity = -2000.0f, .height = 40.0f
+    });
     return dummy;
 }
 
-void renderEntity(sf::RenderWindow& window, const TransformComponent& trans, const CharacterComponent& chara,
-                  const StateMachineComponent& state, bool isPlayer, const DashComponent* dash = nullptr,
-                  const ZTransformComponent* zComp = nullptr) {
-    sf::CircleShape shadow(30.0f);
-    shadow.setOrigin({30.0f, 15.0f});
-    shadow.setScale({1.0f, 0.5f});
-    shadow.setFillColor(sf::Color(0, 0, 0, 100));
-    shadow.setPosition({trans.position.x, trans.position.y});
-    window.draw(shadow);
-    
-    sf::RectangleShape rect({ENTITY_SIZE, ENTITY_SIZE});
-    rect.setOrigin({ENTITY_SIZE / 2.0f, ENTITY_SIZE / 2.0f});
-    
-    float renderX = trans.position.x;
-    float renderY = trans.position.y;
-    if (zComp && zComp->z > 0.0f) {
-        renderY -= zComp->z;
+void placeBomb(GameWorld& world, Entity owner, const InputCommand& input) {
+    Entity bomb = world.ecs.create();
+    const auto& ownerTrans = world.transforms.get(owner);
+    float fx = ownerTrans.facingX, fy = ownerTrans.facingY;
+    if (fx == 0.0f && fy == 0.0f) {
+        if (input.moveDir.x != 0.0f || input.moveDir.y != 0.0f) {
+            float len = std::sqrt(input.moveDir.x * input.moveDir.x + input.moveDir.y * input.moveDir.y);
+            fx = input.moveDir.x / len; fy = input.moveDir.y / len;
+        } else { fx = 1.0f; fy = 0.0f; }
     }
-    
-    rect.setPosition({renderX, renderY});
-    
-    sf::Color entityColor = isPlayer ? COLOR_PLAYER : COLOR_ENEMY;
-
-    if (state.currentState == CharacterState::Dead) {
-        entityColor = COLOR_DEAD;
-    } else if (state.currentState == CharacterState::Hurt) {
-        entityColor = COLOR_HURT;
-    } else if (state.currentState == CharacterState::Dash && dash != nullptr) {
-        if (dash->isInvincible) {
-            entityColor = sf::Color(0, 255, 255, 180);
-        } else {
-            entityColor = sf::Color(isPlayer ? 50 : 200, 100, 100, 200);
-        }
-    }
-
-    rect.setFillColor(entityColor);
-    window.draw(rect);
-    
-    float hpBarWidth = 40.0f;
-    float hpBarHeight = 5.0f;
-    float hpBarY = trans.position.y - ENTITY_SIZE / 2.0f - 8.0f;
-    
-    sf::RectangleShape hpBarBg({hpBarWidth, hpBarHeight});
-    hpBarBg.setOrigin({hpBarWidth / 2.0f, hpBarHeight / 2.0f});
-    hpBarBg.setPosition({trans.position.x, hpBarY});
-    hpBarBg.setFillColor(sf::Color(200, 0, 0));
-    window.draw(hpBarBg);
-    
-    float hpPercent = static_cast<float>(chara.currentHP) / std::max(1, chara.maxHP);
-    sf::RectangleShape hpBarFg({hpBarWidth * hpPercent, hpBarHeight});
-    hpBarFg.setOrigin({0.0f, hpBarHeight / 2.0f});
-    hpBarFg.setPosition({trans.position.x - hpBarWidth / 2.0f, hpBarY});
-    hpBarFg.setFillColor(sf::Color(0, 255, 0));
-    window.draw(hpBarFg);
+    float ox = fx * 35.0f, oy = fy * 35.0f;
+    world.transforms.add(bomb, { .position = {ownerTrans.position.x + ox, ownerTrans.position.y + oy},
+        .scale = {1.0f, 1.0f}, .rotation = 0.0f, .velocity = {0.0f, 0.0f}, .facingX = fx, .facingY = fy });
+    world.bombs.add(bomb, { .fuseTimer = 3.0f, .isKicked = false });
+    world.zTransforms.add(bomb, { .z = 20.0f, .vz = 300.0f, .gravity = -1500.0f, .height = 30.0f });
+    world.colliders.add(bomb, { .radius = 12.0f, .isStatic = false, .mass = 1.0f });
 }
 
-void renderHitboxes(sf::RenderWindow& window, const ComponentStore<TransformComponent>& transforms,
-                    const ComponentStore<HitboxComponent>& hitboxes,
-                    const ComponentStore<ZTransformComponent>& zTransforms) {
-    for (Entity entity : hitboxes.entityList()) {
-        if (!transforms.has(entity)) continue;
-        const auto& transform = transforms.get(entity);
-        const auto& hitbox = hitboxes.get(entity);
-        
-        float z = zTransforms.has(entity) ? zTransforms.get(entity).z : 0.0f;
-        
-        float centerX = transform.position.x + hitbox.offset.x;
-        float centerY = transform.position.y + hitbox.offset.y - z;
-        
-        sf::CircleShape circle(hitbox.radius);
-        circle.setOrigin({hitbox.radius, hitbox.radius});
-        circle.setPosition({centerX, centerY});
-        circle.setFillColor(sf::Color(255, 255, 0, 128));
-        window.draw(circle);
-    }
-}
+// ========== 改键状态机（ImGui 用） ==========
+struct RebindState {
+    PlayerIndex player{PlayerIndex::P1};
+    GameAction action{GameAction::Up};
+    bool active{false};
+};
 
-void renderLoot(sf::RenderWindow& window, const ComponentStore<TransformComponent>& transforms,
-                const ComponentStore<ItemDataComponent>& itemDatas) {
-    for (Entity loot : itemDatas.entityList()) {
-        if (!transforms.has(loot)) continue;
-        const auto& transform = transforms.get(loot);
-        sf::CircleShape lootCircle(8.0f);
-        lootCircle.setOrigin({8.0f, 8.0f});
-        lootCircle.setPosition({transform.position.x, transform.position.y});
-        lootCircle.setFillColor(COLOR_LOOT);
-        lootCircle.setOutlineColor(sf::Color(0, 150, 0));
-        lootCircle.setOutlineThickness(2.0f);
-        window.draw(lootCircle);
-    }
-}
-
-void renderBombs(sf::RenderWindow& window, const ComponentStore<TransformComponent>& transforms,
-                 const ComponentStore<BombComponent>& bombs,
-                 const ComponentStore<ZTransformComponent>& zTransforms) {
-    for (Entity entity : bombs.entityList()) {
-        if (!transforms.has(entity)) continue;
-        const auto& transform = transforms.get(entity);
-        const auto& bomb = bombs.get(entity);
-        
-        float z = zTransforms.has(entity) ? zTransforms.get(entity).z : 0.0f;
-        
-        float centerX = transform.position.x;
-        float centerY = transform.position.y - z;
-        
-        sf::CircleShape bombCircle(15.0f);
-        bombCircle.setOrigin({15.0f, 15.0f});
-        bombCircle.setPosition({centerX, centerY});
-        bombCircle.setFillColor(sf::Color(0, 0, 0));
-        
-        float blinkAlpha = 150.0f + 100.0f * std::sin(bomb.fuseTimer * 10.0f);
-        sf::CircleShape fuse(4.0f);
-        fuse.setOrigin({4.0f, 4.0f});
-        fuse.setPosition({centerX + 10.0f, centerY - 10.0f});
-        fuse.setFillColor(sf::Color(255, 0, 0, static_cast<std::uint8_t>(blinkAlpha)));
-        
-        window.draw(bombCircle);
-        window.draw(fuse);
-    }
-}
-
-void renderGrid(sf::RenderWindow& window) {
-    for (float x = 0; x < WINDOW_WIDTH; x += 50) {
-        sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-        line[0].position = {x, 0}; line[1].position = {x, (float)WINDOW_HEIGHT};
-        window.draw(line);
-    }
-    for (float y = 0; y < WINDOW_HEIGHT; y += 50) {
-        sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-        line[0].position = {0, y}; line[1].position = {(float)WINDOW_WIDTH, y};
-        window.draw(line);
-    }
-}
+// ========== 主函数 ==========
 
 int main() {
-    std::cout << "=== Project2 Fixed Timestep & Dash Sandbox ===\n";
-    
-    sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Project2 Fixed Timestep Sandbox");
+    std::cout << "=== Project2 GameWorld Sandbox (ImGui Hybrid Input) ===\n";
+
+    sf::RenderWindow window(sf::VideoMode({WINDOW_WIDTH, WINDOW_HEIGHT}), "Project2 GameWorld Sandbox");
     window.setFramerateLimit(144);
-    
+
+    // ImGui 初始化
+    bool imguiInitOk = ImGui::SFML::Init(window);
+    std::cout << "[ImGui] Init returned: " << (imguiInitOk ? "true (OK)" : "false (FAILED!)") << std::endl;
+    if (!imguiInitOk) {
+        std::cerr << "[ImGui] *** INIT FAILED — ImGui will NOT work! ***" << std::endl;
+    }
+
+    // 加载中文字体（解决乱码）
+    // 基于 __FILE__ 编译期路径，不受 CWD 影响
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->Clear();
+    std::filesystem::path srcDir = std::filesystem::path(__FILE__).parent_path();
+    std::filesystem::path projectRoot = srcDir.parent_path().parent_path(); // sandbox → tests → Project2
+    std::filesystem::path fontPath = projectRoot / "material" / "fonts" / "NotoSansSC-Regular.otf";
+    std::string fontStr = fontPath.string();
+    ImFont* cjkFont = io.Fonts->AddFontFromFileTTF(
+        fontStr.c_str(), 16.0f, nullptr,
+        io.Fonts->GetGlyphRangesChineseFull());
+    if (!cjkFont) {
+        io.Fonts->AddFontDefault();
+    }
+    ImGui::SFML::UpdateFontTexture();
+
     float timeScale = 1.0f;
     bool frameStep = false;
-    
-    ECS ecs;
-    ComponentStore<StateMachineComponent> states;
-    ComponentStore<TransformComponent> transforms;
-    ComponentStore<CharacterComponent> characters;
-    ComponentStore<InputCommand> inputs;
-    ComponentStore<HurtboxComponent> hurtboxes;
-    ComponentStore<AttackStateComponent> attackStates;
-    ComponentStore<HitboxComponent> hitboxes;
-    ComponentStore<LifetimeComponent> lifetimes;
-    ComponentStore<DamageTag> damageTags;
-    ComponentStore<DamageEventComponent> damageEvents;
-    ComponentStore<DeathTag> deathTags;
-    ComponentStore<LootDropComponent> lootDrops;
-    ComponentStore<ItemDataComponent> itemDatas;
-    ComponentStore<PickupBoxComponent> pickupBoxes;
-    ComponentStore<MagnetComponent> magnets;
-    ComponentStore<EvolutionComponent> evolutions;
-    ComponentStore<DashComponent> dashes;
-    ComponentStore<ZTransformComponent> zTransforms;
-    ComponentStore<ColliderComponent> colliders;
-    ComponentStore<AttachedComponent> attachedComponents;
-    ComponentStore<BombComponent> bombs;
-    ComponentStore<DamageTextComponent> damageTexts;
 
+    // ✅ 单一世界上下文
+    GameWorld world;
+    world.inputManager.loadConfig();
+
+    // 实例化所有系统
     StateMachineSystem stateSystem;
     LocomotionSystem locomotionSystem;
     MovementSystem movementSystem;
@@ -581,359 +460,474 @@ int main() {
     BombSystem bombSystem;
     DamageTextSpawnerSystem damageTextSpawnerSystem;
     DamageTextRenderSystem damageTextRenderSystem;
-    
+    RenderSystem renderSystem;
+
     sf::Font font;
     if (!font.openFromFile("/System/Library/Fonts/Supplemental/Arial Unicode.ttf")) {
         font.openFromFile("/System/Library/Fonts/Helvetica.ttc");
     }
 
-    auto player = createPlayer(ecs, states, transforms, characters, inputs, hurtboxes, evolutions, dashes, magnets, zTransforms, colliders, 200, 300);
-    auto dummy = createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, colliders, 700, 300);
-    
+    world.player1 = createPlayer(world, 250, 300);
+    world.player2 = createPlayer(world, 750, 300);
+
     const sf::Time TIME_PER_FRAME = sf::seconds(1.0f / 60.0f);
     sf::Time timeSinceLastUpdate = sf::Time::Zero;
     sf::Clock clock, debugClock;
-    
-    // ========== GameJuice 全局打击感状态器 ==========
-    GameJuice juice;
-    
-    // ========== 输入管理器初始化 ==========
-    InputManager inputManager;
-    
-    // 输入缓存变量
-    bool lastAttackPressed = false;
-    bool lastDashPressed = false;
-    bool lastBombPressed = false;
-    bool lastHelpPressed = false;
-    
-    // UI 帮助面板开关
-    bool showHelpUI = false;
-    
-    // ========== 改键状态机 ==========
-    bool isRebinding = false;
-    GameAction actionToRebind = GameAction::Attack;
-    
-    // ========== 菜单导航状态 ==========
-    // 可供改键的动作列表（决定菜单显示的顺序）
-    std::vector<GameAction> bindableActions = {
-        GameAction::Up, GameAction::Down, GameAction::Left, GameAction::Right,
+
+    // ImGui 面板状态
+    bool showImGuiPanel = false;
+    bool lastF1Pressed = false;
+    bool f1Pressed = false;
+    RebindState rebindState;
+
+    // 动作按钮列表
+    std::vector<GameAction> actionButtons = {
         GameAction::Attack, GameAction::Dash, GameAction::DropBomb,
-        GameAction::Jump, GameAction::Pause, GameAction::FrameStep,
-        GameAction::SpawnDummy
+        GameAction::Jump, GameAction::Pause, GameAction::FrameStep
     };
-    
-    // 用于 UI 显示的动作名称映射
-    std::unordered_map<GameAction, std::string> actionNames = {
-        {GameAction::Up, "Move Up"},
-        {GameAction::Down, "Move Down"},
-        {GameAction::Left, "Move Left"},
-        {GameAction::Right, "Move Right"},
-        {GameAction::Attack, "Attack"},
-        {GameAction::Dash, "Dash / Kick"},
-        {GameAction::DropBomb, "Drop Bomb"},
-        {GameAction::Jump, "Jump"},
-        {GameAction::Pause, "Pause / Resume"},
-        {GameAction::FrameStep, "Frame Step"},
-        {GameAction::SpawnDummy, "Spawn Dummy (Mouse)"}
+    std::vector<GameAction> moveButtons = {
+        GameAction::Up, GameAction::Down, GameAction::Left, GameAction::Right
     };
-    
-    int selectedMenuIndex = 0; // 当前选中的菜单行
-    
-    // 复活倒计时
-    float respawnTimer = 0.0f;
-    
+
+    // 用于检测 P2 手柄连接的变量
+    bool lastP2JoystickConnected = sf::Joystick::isConnected(0);
+
     while (window.isOpen()) {
-        // ========== 时间法则：接管游戏时间流速 ==========
-        float realDt = clock.restart().asSeconds();
-        
-        // 1. 更新顿帧 (Hit-Stop) 逻辑
-        if (juice.hitStopTimer > 0.0f) {
-            juice.hitStopTimer -= realDt;  // 必须用真实时间流逝
-            if (juice.hitStopTimer <= 0.0f) {
-                juice.timeScale = 1.0f;    // 时间恢复流动！
-                juice.hitStopTimer = 0.0f;
-            } else {
-                juice.timeScale = 0.0f;    // 时间绝对静止！
-            }
-        }
-        
-        // 2. 游戏物理逻辑时间 (gameDt) 受到 timeScale 影响
-        float gameDt = realDt * juice.timeScale;
-        timeSinceLastUpdate += sf::seconds(gameDt);  // 顿帧时不累加，固定步长不会执行！
-        
+        // ========== 事件处理 ==========
         while (const auto event = window.pollEvent()) {
+            // ========== ImGui 事件处理（最高优先级） ==========
+            ImGui::SFML::ProcessEvent(window, *event);
+
             if (event->is<sf::Event::Closed>()) window.close();
-            
-            // ========== 改键拦截逻辑（最高优先级）==========
-            // 支持键盘改键
-            if (isRebinding && event->is<sf::Event::KeyPressed>()) {
-                const auto* kp = event->getIf<sf::Event::KeyPressed>();
-                EngineKey pressedKey = toEngineKey(kp->code);
-                
-                if (pressedKey != EngineKey::Unknown && pressedKey != EngineKey::Escape) {
-                    // ========== 按键冲突检测 ==========
-                    bool hasConflict = false;
-                    GameAction conflictingAction = GameAction::Up; // dummy init
-                    
-                    for (const auto& [action, key] : inputManager.bindings) {
-                        if (key == pressedKey && action != actionToRebind) {
-                            hasConflict = true;
-                            conflictingAction = action;
-                            break;
-                        }
-                    }
-                    
-                    if (hasConflict) {
-                        // 检测到冲突：先解除旧绑定，再保存新绑定
-                        std::cout << "[Rebind] ⚠️  Conflict! " << inputManager.keyToString(pressedKey)
-                                  << " is already bound to " << inputManager.actionToString(conflictingAction)
-                                  << ". Clearing old binding." << std::endl;
-                    }
-                    
-                    // 保存新绑定（会自动覆盖冲突）
-                    inputManager.bindings[actionToRebind] = pressedKey;
-                    inputManager.saveConfig();
-                    std::cout << "[Rebind] ✅ " << inputManager.actionToString(actionToRebind) 
-                              << " -> " << inputManager.keyToString(pressedKey) << std::endl;
+
+            // ========== F1 原生事件检测（绕过 imgui-SFML 兼容性问题） ==========
+            if (const auto* kp = event->getIf<sf::Event::KeyPressed>()) {
+                if (kp->code == sf::Keyboard::Key::F1) {
+                    f1Pressed = true;
                 }
-                
-                isRebinding = false;
-                continue; // 绝对拦截！防止按键渗透到游戏逻辑
             }
-            else if (isRebinding && event->is<sf::Event::MouseButtonPressed>()) {
-                const auto* mb = event->getIf<sf::Event::MouseButtonPressed>();
-                EngineKey pressedKey = toEngineKey(mb->button);
-                
-                if (pressedKey != EngineKey::Unknown) {
-                    // 按键冲突检测
-                    bool hasConflict = false;
-                    GameAction conflictingAction = GameAction::Up;
-                    
-                    for (const auto& [action, key] : inputManager.bindings) {
-                        if (key == pressedKey && action != actionToRebind) {
-                            hasConflict = true;
-                            conflictingAction = action;
-                            break;
-                        }
-                    }
-                    
-                    if (hasConflict) {
-                        std::cout << "[Rebind] ⚠️  Conflict! " << inputManager.keyToString(pressedKey)
-                                  << " is already bound to " << inputManager.actionToString(conflictingAction)
-                                  << ". Clearing old binding." << std::endl;
-                    }
-                    
-                    inputManager.bindings[actionToRebind] = pressedKey;
-                    inputManager.saveConfig();
-                    std::cout << "[Rebind] ✅ " << inputManager.actionToString(actionToRebind) 
-                              << " -> " << inputManager.keyToString(pressedKey) << std::endl;
+
+            // ========== 改键拦截（ImGui 面板中触发） ==========
+            if (rebindState.active && event->is<sf::Event::KeyPressed>()) {
+                const auto* kp = event->getIf<sf::Event::KeyPressed>();
+                std::cout << "[Rebind-Debug] KeyPressed: sfKey=" << static_cast<int>(kp->code) << std::endl;
+                EngineKey pressedKey = toEngineKey(kp->code);
+                std::cout << "[Rebind-Debug]   mappedKey=" << world.inputManager.keyToString(pressedKey) << std::endl;
+
+                // Escape: 取消当前改键操作
+                if (pressedKey == EngineKey::Escape) {
+                    std::cout << "[Rebind] Cancelled (Escape)" << std::endl;
+                    rebindState.active = false;
+                    continue;
                 }
-                
-                isRebinding = false;
+
+                // Delete / Backspace: 清除该动作的绑定（设为 Unknown）
+                if (pressedKey == EngineKey::Delete || pressedKey == EngineKey::Backspace) {
+                    world.inputManager.setMappedKey(rebindState.player, rebindState.action, EngineKey::Unknown);
+                    std::cout << "[Rebind] [" << (rebindState.player == PlayerIndex::P1 ? "P1" : "P2") << "] "
+                              << world.inputManager.actionToString(rebindState.action)
+                              << " -> [Cleared]" << std::endl;
+                    rebindState.active = false;
+                    continue;
+                }
+
+                if (pressedKey == EngineKey::Unknown) {
+                    std::cout << "[Rebind-Warn] Key not mapped to any EngineKey (sfKey=" << static_cast<int>(kp->code) << ")" << std::endl;
+                    rebindState.active = false;
+                    continue;
+                }
+
+                // 冲突检测：直接解除旧绑定，新键绑定到新动作
+                auto conflictOpt = world.inputManager.findActionByKey(rebindState.player, pressedKey);
+                if (conflictOpt.has_value() && conflictOpt.value() != rebindState.action) {
+                    GameAction oldAction = conflictOpt.value();
+                    world.inputManager.setMappedKey(rebindState.player, oldAction, EngineKey::Unknown);
+                    std::cout << "[Rebind-Override] [" << (rebindState.player == PlayerIndex::P1 ? "P1" : "P2") << "] "
+                              << "解除 [" << world.inputManager.actionToString(oldAction) << "] 的绑定" << std::endl;
+                }
+                world.inputManager.setMappedKey(rebindState.player, rebindState.action, pressedKey);
+                std::cout << "[Rebind] [" << (rebindState.player == PlayerIndex::P1 ? "P1" : "P2") << "] "
+                          << world.inputManager.actionToString(rebindState.action)
+                          << " -> " << world.inputManager.keyToString(pressedKey) << std::endl;
+                rebindState.active = false;
                 continue;
             }
-            
-            // ========== 菜单导航拦截（UI 打开时）==========
-            if (showHelpUI && !isRebinding && event->is<sf::Event::KeyPressed>()) {
-                const auto* kp = event->getIf<sf::Event::KeyPressed>();
-                
-                // 上下选择
-                if (kp->code == sf::Keyboard::Key::Up || kp->code == sf::Keyboard::Key::W) {
-                    selectedMenuIndex = (selectedMenuIndex - 1 + static_cast<int>(bindableActions.size())) % static_cast<int>(bindableActions.size());
-                    continue; // 拦截，防止渗透到游戏逻辑
+            else if (rebindState.active && event->is<sf::Event::MouseButtonPressed>()) {
+                const auto* mb = event->getIf<sf::Event::MouseButtonPressed>();
+                EngineKey pressedKey = toEngineKey(mb->button);
+                if (pressedKey == EngineKey::Unknown) {
+                    std::cout << "[Rebind-Warn] Unknown mouse button" << std::endl;
+                    rebindState.active = false;
+                    continue;
                 }
-                if (kp->code == sf::Keyboard::Key::Down || kp->code == sf::Keyboard::Key::S) {
-                    selectedMenuIndex = (selectedMenuIndex + 1) % static_cast<int>(bindableActions.size());
-                    continue; // 拦截
+
+                // 冲突检测：直接解除旧绑定
+                auto conflictOpt = world.inputManager.findActionByKey(rebindState.player, pressedKey);
+                if (conflictOpt.has_value() && conflictOpt.value() != rebindState.action) {
+                    GameAction oldAction = conflictOpt.value();
+                    world.inputManager.setMappedKey(rebindState.player, oldAction, EngineKey::Unknown);
+                    std::cout << "[Rebind-Override] [" << (rebindState.player == PlayerIndex::P1 ? "P1" : "P2") << "] "
+                              << "解除 [" << world.inputManager.actionToString(oldAction) << "] 的绑定" << std::endl;
                 }
-                // 回车确认改键
-                if (kp->code == sf::Keyboard::Key::Enter) {
-                    isRebinding = true;
-                    actionToRebind = bindableActions[selectedMenuIndex];
-                    std::cout << "[Rebind] Selecting: " << actionNames[actionToRebind] << "...\n";
-                    continue; // 拦截
-                }
+                world.inputManager.setMappedKey(rebindState.player, rebindState.action, pressedKey);
+                std::cout << "[Rebind] [" << (rebindState.player == PlayerIndex::P1 ? "P1" : "P2") << "] "
+                          << world.inputManager.actionToString(rebindState.action)
+                          << " -> " << world.inputManager.keyToString(pressedKey) << std::endl;
+                rebindState.active = false;
+                continue;
             }
-            
-            // 普通按键处理（UI 关闭或菜单未激活时）
+            else if (rebindState.active && event->is<sf::Event::JoystickButtonPressed>()) {
+                const auto* jb = event->getIf<sf::Event::JoystickButtonPressed>();
+                EngineKey pressedKey = toEngineKey(jb->button);
+                std::cout << "[Rebind-Debug] JoystickButtonPressed: joystickId=" << jb->joystickId
+                          << " button=" << jb->button << " mappedKey=" << world.inputManager.keyToString(pressedKey) << std::endl;
+                if (pressedKey == EngineKey::Unknown) {
+                    std::cout << "[Rebind-Warn] Unknown joystick button" << std::endl;
+                    rebindState.active = false;
+                    continue;
+                }
+
+                // 冲突检测：直接解除旧绑定
+                auto conflictOpt = world.inputManager.findActionByKey(rebindState.player, pressedKey);
+                if (conflictOpt.has_value() && conflictOpt.value() != rebindState.action) {
+                    GameAction oldAction = conflictOpt.value();
+                    world.inputManager.setMappedKey(rebindState.player, oldAction, EngineKey::Unknown);
+                    std::cout << "[Rebind-Override] [" << (rebindState.player == PlayerIndex::P1 ? "P1" : "P2") << "] "
+                              << "解除 [" << world.inputManager.actionToString(oldAction) << "] 的绑定" << std::endl;
+                }
+                world.inputManager.setMappedKey(rebindState.player, rebindState.action, pressedKey);
+                std::cout << "[Rebind] [" << (rebindState.player == PlayerIndex::P1 ? "P1" : "P2") << "] "
+                          << world.inputManager.actionToString(rebindState.action)
+                          << " -> " << world.inputManager.keyToString(pressedKey) << std::endl;
+                rebindState.active = false;
+                continue;
+            }
+
             if (const auto* kp = event->getIf<sf::Event::KeyPressed>()) {
                 if (kp->code == sf::Keyboard::Key::Escape) window.close();
             }
-            
-            // 暂停和帧步进（使用输入映射系统，支持动态改键）
-            bool currentPausePressed = isActionPressed(inputManager, GameAction::Pause);
-            static bool lastPausePressed = false;
-            if (currentPausePressed && !lastPausePressed) {
+
+            // 生成假人
+            if (const auto* mb = event->getIf<sf::Event::MouseButtonPressed>()) {
+                if (world.inputManager.getMappedKey(PlayerIndex::P1, GameAction::SpawnDummy) == EngineKey::MouseRight
+                    && mb->button == sf::Mouse::Button::Right) {
+                    sf::Vector2f worldPos = window.mapPixelToCoords(mb->position);
+                    createDummy(world, worldPos.x, worldPos.y);
+                    std::cout << "[SpawnDummy] Dummy created at (" << worldPos.x << ", " << worldPos.y << ")\n";
+                }
+            }
+        }
+
+        // ========== ImGui 更新 ==========
+        sf::Time deltaTime = clock.restart();
+        ImGui::SFML::Update(window, deltaTime);
+
+        // ========== F1 切换面板 ==========
+        if (f1Pressed && !lastF1Pressed) {
+            showImGuiPanel = !showImGuiPanel;
+        }
+        lastF1Pressed = f1Pressed;
+        f1Pressed = false;  // 重置，等待下一帧事件
+
+        // ========== ImGui 控制面板 ==========
+        if (showImGuiPanel) {
+            std::cout << "[ImGui-Render] About to call ImGui::Begin (panel is open)" << std::endl;
+            if (ImGui::Begin("控制与调试 (Controls & Debug)")) {
+                std::cout << "[ImGui-Render] ImGui::Begin returned true — drawing content" << std::endl;
+
+            // ========== P1 设置面板（纯字典映射） ==========
+            if (ImGui::CollapsingHeader("Player 1 - 键盘", ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::Text("移动 (方向键)");
+                for (GameAction action : moveButtons) {
+                    ImGui::SameLine();
+                    EngineKey key = world.inputManager.getMappedKey(PlayerIndex::P1, action);
+                    std::string label = world.inputManager.actionToString(action) + "##move_p1_" + std::to_string(static_cast<int>(action));
+                    std::string btnLabel;
+                    if (rebindState.active && rebindState.player == PlayerIndex::P1 && rebindState.action == action) {
+                        float blink = std::sin(ImGui::GetTime() * 8.0f);
+                        btnLabel = blink > 0 ? "[ PRESS ANY KEY ]" : "[              ]";
+                    } else {
+                        btnLabel = world.inputManager.keyToString(key);
+                    }
+                    if (ImGui::Button(btnLabel.c_str())) {
+                        rebindState = {PlayerIndex::P1, action, true};
+                    }
+                }
+                ImGui::Separator();
+
+                ImGui::Text("动作键");
+                for (GameAction action : actionButtons) {
+                    EngineKey key = world.inputManager.getMappedKey(PlayerIndex::P1, action);
+                    std::string btnLabel;
+                    if (rebindState.active && rebindState.player == PlayerIndex::P1 && rebindState.action == action) {
+                        float blink = std::sin(ImGui::GetTime() * 8.0f);
+                        btnLabel = blink > 0 ? "[ PRESS ANY KEY ]" : "[              ]";
+                    } else {
+                        btnLabel = world.inputManager.keyToString(key);
+                    }
+                    if (ImGui::Button(btnLabel.c_str())) {
+                        rebindState = {PlayerIndex::P1, action, true};
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextDisabled(world.inputManager.actionToString(action).c_str());
+                }
+            }
+
+            // ========== P2 设置面板（原生摇杆 + 字典动作） ==========
+            if (ImGui::CollapsingHeader("Player 2 - 手柄", ImGuiTreeNodeFlags_DefaultOpen)) {
+                bool p2Connected = sf::Joystick::isConnected(0);
+
+                // 移动：原生模拟量，禁止改键
+                ImGui::TextDisabled("左摇杆 : [ 硬件原生直连 (Native Analog) ]");
+                if (p2Connected) {
+                    float jx = sf::Joystick::getAxisPosition(0, sf::Joystick::Axis::X);
+                    float jy = sf::Joystick::getAxisPosition(0, sf::Joystick::Axis::Y);
+                    ImGui::SameLine();
+                    ImGui::Text("X=%.1f Y=%.1f", jx, jy);
+                } else {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("(未连接)");
+                }
+
+                ImGui::Separator();
+
+                // 动作键：可改键
+                ImGui::Text("动作映射");
+                for (GameAction action : actionButtons) {
+                    EngineKey key = world.inputManager.getMappedKey(PlayerIndex::P2, action);
+                    std::string btnLabel;
+                    if (rebindState.active && rebindState.player == PlayerIndex::P2 && rebindState.action == action) {
+                        float blink = std::sin(ImGui::GetTime() * 8.0f);
+                        btnLabel = blink > 0 ? "[ PRESS ANY KEY ]" : "[              ]";
+                    } else {
+                        btnLabel = world.inputManager.keyToString(key);
+                    }
+                    if (ImGui::Button(btnLabel.c_str())) {
+                        rebindState = {PlayerIndex::P2, action, true};
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextDisabled(world.inputManager.actionToString(action).c_str());
+                }
+            }
+
+            ImGui::Separator();
+
+            // 保存按钮
+            if (ImGui::Button("保存配置到 JSON", ImVec2(200, 30))) {
+                world.inputManager.saveConfig();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("重置为默认", ImVec2(200, 30))) {
+                world.inputManager.resetToDefaults();
+                std::cout << "[Rebind] All bindings reset to defaults" << std::endl;
+            }
+
+            ImGui::Separator();
+
+            // 调试信息
+            if (ImGui::CollapsingHeader("调试信息")) {
+                float z1 = world.zTransforms.has(world.player1) ? world.zTransforms.get(world.player1).z : 0.0f;
+                float z2 = world.zTransforms.has(world.player2) ? world.zTransforms.get(world.player2).z : 0.0f;
+                ImGui::Text("P1: HP=%d State=%s Z=%.1f",
+                    world.characters.get(world.player1).currentHP,
+                    stateToString(world.states.get(world.player1).currentState).c_str(), z1);
+                ImGui::Text("P2: HP=%d State=%s Z=%.1f",
+                    world.characters.get(world.player2).currentHP,
+                    stateToString(world.states.get(world.player2).currentState).c_str(), z2);
+                ImGui::Text("实体数: %zu | 掉落物: %zu",
+                    world.ecs.entities().size(), world.itemDatas.entityList().size());
+                ImGui::Text("Juice: timeScale=%.2f shake=%.1f hitStop=%.3f",
+                    world.juice.timeScale, world.juice.shakeIntensity, world.juice.hitStopTimer);
+            }
+        }
+        ImGui::End();
+        }
+
+        // ========== 时间法则 ==========
+        float realDt = deltaTime.asSeconds();
+
+        if (world.juice.hitStopTimer > 0.0f) {
+            world.juice.hitStopTimer -= realDt;
+            if (world.juice.hitStopTimer <= 0.0f) {
+                world.juice.timeScale = 1.0f;
+                world.juice.hitStopTimer = 0.0f;
+            } else {
+                world.juice.timeScale = 0.0f;
+            }
+        }
+
+        float gameDt = realDt * world.juice.timeScale;
+        timeSinceLastUpdate += sf::seconds(gameDt);
+
+        // ================================================================
+        // ✅ 双轨制混合输入流
+        // ================================================================
+
+        // ========== [P1 轨道] 纯字典映射 ==========
+        {
+            Vec2 p1Dir{0.0f, 0.0f};
+            bool up    = isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::Up);
+            bool down  = isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::Down);
+            bool left  = isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::Left);
+            bool right = isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::Right);
+            if (up)    p1Dir.y -= 1.0f;
+            if (down)  p1Dir.y += 1.0f;
+            if (left)  p1Dir.x -= 1.0f;
+            if (right) p1Dir.x += 1.0f;
+            if (float len = std::sqrt(p1Dir.x * p1Dir.x + p1Dir.y * p1Dir.y); len > 0.0f) {
+                p1Dir.x /= len; p1Dir.y /= len;
+            }
+
+            auto& p1In = world.inputs.get(world.player1);
+            p1In.moveDir = p1Dir;
+
+            static bool lastP1Atk = false, lastP1Dash = false, lastP1Bomb = false;
+            static float p1BombCD = 0.0f;
+
+            bool p1Atk = isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::Attack);
+            if (p1Atk && !lastP1Atk) { p1In.pendingIntent = ActionIntent::Attack; p1In.intentTimer = 0.2f; }
+            lastP1Atk = p1Atk;
+
+            bool p1Dash = isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::Dash);
+            if (p1Dash && !lastP1Dash) { p1In.pendingIntent = ActionIntent::Dash; p1In.intentTimer = 0.2f; }
+            lastP1Dash = p1Dash;
+
+            if (isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::Jump) && world.zTransforms.has(world.player1)) {
+                auto& zc = world.zTransforms.get(world.player1);
+                if (zc.isGrounded()) { zc.vz = 800.0f; }
+            }
+
+            p1BombCD = std::max(0.0f, p1BombCD - realDt);
+            bool p1Bomb = isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::DropBomb);
+            if (p1Bomb && !lastP1Bomb && p1BombCD <= 0.0f) {
+                placeBomb(world, world.player1, world.inputs.get(world.player1));
+                p1BombCD = 0.5f;
+            }
+            lastP1Bomb = p1Bomb;
+
+            // P1 暂停/帧步进
+            static bool lastP1Pause = false, lastP1Step = false;
+            bool p1Pause = isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::Pause);
+            if (p1Pause && !lastP1Pause) {
                 timeScale = (timeScale == 0.0f) ? 1.0f : 0.0f;
                 std::cout << "[TimeScale] " << (timeScale == 0.0f ? "Paused" : "Running") << "\n";
             }
-            lastPausePressed = currentPausePressed;
-            
-            bool currentFrameStepPressed = isActionPressed(inputManager, GameAction::FrameStep);
-            static bool lastFrameStepPressed = false;
-            if (currentFrameStepPressed && !lastFrameStepPressed) {
-                frameStep = true;
-                timeScale = 1.0f;
-            }
-            lastFrameStepPressed = currentFrameStepPressed;
-            
-            // 生成假人输入 — 必须用事件驱动，不能用 isActionPressed 实时检测
-            // （放在 pollEvent 循环内才能可靠捕获鼠标点击事件）
-            if (const auto* mb = event->getIf<sf::Event::MouseButtonPressed>()) {
-                if (inputManager.getMappedKey(GameAction::SpawnDummy) == EngineKey::MouseRight
-                    && mb->button == sf::Mouse::Button::Right) {
-                    sf::Vector2f worldPos = window.mapPixelToCoords(mb->position);
-                    createDummy(ecs, states, transforms, characters, hurtboxes, lootDrops, colliders, worldPos.x, worldPos.y);
-                    std::cout << "[SpawnDummy] 🎯 Dummy created at (" << worldPos.x << ", " << worldPos.y << ")\n";
+            lastP1Pause = p1Pause;
+
+            bool p1Step = isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::FrameStep);
+            if (p1Step && !lastP1Step) { frameStep = true; timeScale = 1.0f; }
+            lastP1Step = p1Step;
+        }
+
+        // ========== [P2 轨道] 原生摇杆模拟量 + 字典动作 ==========
+        {
+            Vec2 p2Dir{0.0f, 0.0f};
+
+            if (sf::Joystick::isConnected(0)) {
+                // 原生模拟量：直接读取摇杆轴
+                float jx = sf::Joystick::getAxisPosition(0, sf::Joystick::Axis::X);
+                float jy = sf::Joystick::getAxisPosition(0, sf::Joystick::Axis::Y);
+
+                // 死区过滤
+                if (std::abs(jx) > 20.0f) p2Dir.x = jx / 100.0f;
+                if (std::abs(jy) > 20.0f) p2Dir.y = jy / 100.0f;
+
+                // 限制最大长度（不归一化，保留轻推慢走）
+                float len = std::sqrt(p2Dir.x * p2Dir.x + p2Dir.y * p2Dir.y);
+                if (len > 1.0f) {
+                    p2Dir.x /= len;
+                    p2Dir.y /= len;
+                }
+            } else {
+                // 键盘降级（通过 InputManager 查询）
+                bool up    = isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::Up);
+                bool down  = isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::Down);
+                bool left  = isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::Left);
+                bool right = isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::Right);
+                if (up)    p2Dir.y -= 1.0f;
+                if (down)  p2Dir.y += 1.0f;
+                if (left)  p2Dir.x -= 1.0f;
+                if (right) p2Dir.x += 1.0f;
+                if (float l = std::sqrt(p2Dir.x * p2Dir.x + p2Dir.y * p2Dir.y); l > 0.0f) {
+                    p2Dir.x /= l; p2Dir.y /= l;
                 }
             }
-        }
-        
-        // --- 循环外：抓取瞬时输入（使用输入映射系统）---
-        
-        // UI 帮助面板切换
-        bool currentHelpPressed = isActionPressed(inputManager, GameAction::ToggleHelp);
-        if (currentHelpPressed && !lastHelpPressed) {
-            showHelpUI = !showHelpUI;
-            std::cout << "[UI] Help overlay: " << (showHelpUI ? "ON" : "OFF") << "\n";
-        }
-        lastHelpPressed = currentHelpPressed;
-        
-        // 抓取移动输入（已归一化）
-        inputs.get(player).moveDir = getMappedInput(inputManager);
-        
-        // 攻击指令
-        bool currentAttackPressed = isActionPressed(inputManager, GameAction::Attack);
-        if (currentAttackPressed && !lastAttackPressed) {
-            inputs.get(player).pendingIntent = ActionIntent::Attack;
-            inputs.get(player).intentTimer = 0.2f;
-            std::cout << "[Input] 🗡️ Attack pressed!\n";
-        }
-        lastAttackPressed = currentAttackPressed;
 
-        // 冲刺指令（覆盖攻击指令）
-        bool currentDashPressed = isActionPressed(inputManager, GameAction::Dash);
-        if (currentDashPressed && !lastDashPressed) {
-            inputs.get(player).pendingIntent = ActionIntent::Dash;
-            inputs.get(player).intentTimer = 0.2f;
-            std::cout << "[Input] 💨 Dash pressed!\n";
-        }
-        lastDashPressed = currentDashPressed;
-        
-        // 跳跃输入（使用输入映射系统，支持动态改键）
-        bool jumpPressed = isActionPressed(inputManager, GameAction::Jump);
-        if (jumpPressed && zTransforms.has(player)) {
-            auto& zComp = zTransforms.get(player);
-            if (zComp.isGrounded()) {
-                zComp.jump(800.0f);
-                std::cout << "[Jump] Player jumped! vz=800\n";
-            }
-        }
-        
-        // 丢炸弹输入
-        bool bombPressed = isActionPressed(inputManager, GameAction::DropBomb);
-        
-        static float bombCooldown = 0.0f;
-        if (bombCooldown > 0.0f) {
-            bombCooldown -= realDt;
-        }
-        
-        if (bombPressed && !lastBombPressed && bombCooldown <= 0.0f) {
-            Entity bomb = ecs.create();
-            
-            std::cout << "[Bomb] 📦 放置炸弹！ID=" << (uint32_t)bomb << " CD=0.5s\n";
-            bombCooldown = 0.5f;
-                
-            const auto& playerTrans = transforms.get(player);
-            const auto& playerZ = zTransforms.get(player);
-            
-            float facingX = playerTrans.facingX;
-            float facingY = playerTrans.facingY;
-            
-            if (facingX == 0.0f && facingY == 0.0f) {
-                const auto& input = inputs.get(player);
-                if (input.moveDir.x != 0.0f || input.moveDir.y != 0.0f) {
-                    facingX = input.moveDir.x;
-                    facingY = input.moveDir.y;
-                    float len = std::sqrt(facingX * facingX + facingY * facingY);
-                    if (len > 0.0f) {
-                        facingX /= len;
-                        facingY /= len;
-                    }
-                } else {
-                    facingX = 1.0f;
-                    facingY = 0.0f;
-                }
-            }
-            
-            float offsetX = facingX * 35.0f;
-            float offsetY = facingY * 35.0f;
-            
-            transforms.add(bomb, {
-                .position = {playerTrans.position.x + offsetX, playerTrans.position.y + offsetY},
-                .scale = {1.0f, 1.0f},
-                .rotation = 0.0f,
-                .velocity = {0.0f, 0.0f}
-            });
-            
-            bombs.add(bomb, {
-                .fuseTimer = 3.0f,
-                .isKicked = false
-            });
-            
-            zTransforms.add(bomb, {
-                .z = 20.0f,
-                .vz = 300.0f,
-                .gravity = -1500.0f,
-                .height = 30.0f
-            });
-            
-            colliders.add(bomb, {
-                .radius = 12.0f,
-                .isStatic = false,
-                .mass = 1.0f
-            });
-            
-            std::cout << "[Bomb] 丢出炸弹！fuse=3.0s pos=(" 
-                      << (playerTrans.position.x + offsetX) << ", "
-                      << (playerTrans.position.y + offsetY) << ")\n";
-        }
-        lastBombPressed = bombPressed;
+            auto& p2In = world.inputs.get(world.player2);
+            p2In.moveDir = p2Dir;
 
-        // --- 神圣的 Fixed Timestep 物理循环 ---
+            static bool lastP2Atk = false, lastP2Dash = false, lastP2Bomb = false;
+            static float p2BombCD = 0.0f;
+
+            // P2 动作：通过 InputManager 查询（支持改键）
+            bool p2Atk = isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::Attack);
+            if (p2Atk && !lastP2Atk) { p2In.pendingIntent = ActionIntent::Attack; p2In.intentTimer = 0.2f; }
+            lastP2Atk = p2Atk;
+
+            bool p2Dash = isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::Dash);
+            if (p2Dash && !lastP2Dash) { p2In.pendingIntent = ActionIntent::Dash; p2In.intentTimer = 0.2f; }
+            lastP2Dash = p2Dash;
+
+            if (isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::Jump) && world.zTransforms.has(world.player2)) {
+                auto& zc = world.zTransforms.get(world.player2);
+                if (zc.isGrounded()) { zc.vz = 800.0f; }
+            }
+
+            p2BombCD = std::max(0.0f, p2BombCD - realDt);
+            bool p2Bomb = isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::DropBomb);
+            if (p2Bomb && !lastP2Bomb && p2BombCD <= 0.0f) {
+                placeBomb(world, world.player2, world.inputs.get(world.player2));
+                p2BombCD = 0.5f;
+            }
+            lastP2Bomb = p2Bomb;
+
+            // P2 暂停/帧步进
+            static bool lastP2Pause = false, lastP2Step = false;
+            bool p2Pause = isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::Pause);
+            if (p2Pause && !lastP2Pause) {
+                timeScale = (timeScale == 0.0f) ? 1.0f : 0.0f;
+                std::cout << "[TimeScale] " << (timeScale == 0.0f ? "Paused" : "Running") << "\n";
+            }
+            lastP2Pause = p2Pause;
+
+            bool p2Step = isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::FrameStep);
+            if (p2Step && !lastP2Step) { frameStep = true; timeScale = 1.0f; }
+            lastP2Step = p2Step;
+        }
+
+        // ================================================================
+        // ✅ Fixed Timestep 物理循环
+        // ================================================================
         while (timeSinceLastUpdate >= TIME_PER_FRAME) {
             timeSinceLastUpdate -= TIME_PER_FRAME;
-            float fixedDt = TIME_PER_FRAME.asSeconds();  // timeScale 已通过 gameDt 控制
-            
+            float fixedDt = TIME_PER_FRAME.asSeconds();
+
             if (frameStep) {
                 frameStep = false;
                 timeScale = 0.0f;
                 std::cout << "[FrameStep] Single frame executed\n";
             }
-            
-            stateSystem.update(states, attackStates, inputs, damageEvents, ecs, fixedDt);
-            dashSystem.update(dashes, states, transforms, inputs, fixedDt);
-            locomotionSystem.update(states, transforms, characters, inputs, fixedDt);
-            magnetSystem.update(transforms, magnets, transforms, itemDatas, fixedDt);
-            bombSystem.update(bombs, transforms, zTransforms, states, characters, hitboxes, lifetimes, transforms, deathTags, ecs, fixedDt);
-            
-            for (Entity entity : zTransforms.entityList()) {
-                if (zTransforms.has(entity)) {
-                    auto& zTrans = zTransforms.get(entity);
+
+            stateSystem.update(world, fixedDt);
+            dashSystem.update(world, fixedDt);
+            locomotionSystem.update(world, fixedDt);
+            magnetSystem.update(world, fixedDt);
+            bombSystem.update(world, fixedDt);
+
+            // Z 轴物理
+            for (Entity entity : world.zTransforms.entityList()) {
+                if (world.zTransforms.has(entity)) {
+                    auto& zTrans = world.zTransforms.get(entity);
                     zTrans.applyGravity(fixedDt);
-                    
                     if (zTrans.z <= 0.0f) {
                         zTrans.z = 0.0f;
-                        
-                        if (states.has(entity)) {
-                            auto& state = states.get(entity);
+                        if (world.states.has(entity)) {
+                            auto& state = world.states.get(entity);
                             if (state.currentState == CharacterState::KnockedAirborne) {
                                 state.currentState = CharacterState::Idle;
                                 state.previousState = CharacterState::Idle;
-                                std::cout << "[ZPhysics] 🛬 落地恢复！Entity " << entity << " → Idle\n";
                             }
                         }
-                        
                         if (zTrans.vz < 0.0f && std::abs(zTrans.vz) > 50.0f) {
                             zTrans.vz = -zTrans.vz * 0.5f;
                         } else {
@@ -942,162 +936,66 @@ int main() {
                     }
                 }
             }
-            
-            movementSystem.update(transforms, itemDatas, states, bombs, zTransforms, fixedDt);
-            physicalCollisionSystem.update(colliders, transforms, fixedDt);
-            attachmentSystem.update(attachedComponents, transforms, zTransforms, fixedDt);
-            attackSystem.update(states, attackStates, transforms, characters, ecs, hitboxes, lifetimes, attachedComponents, zTransforms, fixedDt);
-            collisionSystem.update(hitboxes, hurtboxes, transforms, transforms, zTransforms, damageEvents, ecs, fixedDt);
-            damageSystem.update(characters, damageEvents, deathTags, states, dashes, transforms, zTransforms, damageTexts, lifetimes, ecs, juice);
-            lootSpawnSystem.update(transforms, lootDrops, itemDatas, pickupBoxes, deathTags, ecs);
-            deathSystem.update(states, transforms, characters, hurtboxes, lootDrops, inputs, deathTags, ecs, evolutions, fixedDt);
-            pickupSystem.update(ecs, evolutions, transforms, transforms, itemDatas, pickupBoxes, magnets);
-            
-            if (states.get(player).currentState == CharacterState::Dead) {
-                respawnTimer += fixedDt;
-                if (respawnTimer >= 2.0f) {
-                    characters.get(player).currentHP = characters.get(player).maxHP;
-                    states.get(player).currentState = CharacterState::Idle;
-                    states.get(player).previousState = CharacterState::Idle;
-                    states.get(player).stateTimer = 0.0f;
-                    transforms.get(player).position = {200.0f, 300.0f};
-                    transforms.get(player).velocity = {0.0f, 0.0f};
-                    respawnTimer = 0.0f;
-                    std::cout << "[Respawn] Player revived! HP=100, pos=(200,300)\n";
+
+            movementSystem.update(world, fixedDt);
+            physicalCollisionSystem.update(world, fixedDt);
+            attachmentSystem.update(world, fixedDt);
+            attackSystem.update(world, fixedDt);
+            collisionSystem.update(world, fixedDt);
+            damageSystem.update(world, fixedDt);
+            lootSpawnSystem.update(world, fixedDt);
+            deathSystem.update(world, fixedDt);
+            pickupSystem.update(world, fixedDt);
+
+            // PvP 复活
+            static float respawn1 = 0.0f, respawn2 = 0.0f;
+            if (world.states.has(world.player1) && world.states.get(world.player1).currentState == CharacterState::Dead) {
+                respawn1 += fixedDt;
+                if (respawn1 >= 2.0f) {
+                    world.characters.get(world.player1).currentHP = world.characters.get(world.player1).maxHP;
+                    world.states.get(world.player1).currentState = CharacterState::Idle;
+                    world.states.get(world.player1).previousState = CharacterState::Idle;
+                    world.states.get(world.player1).stateTimer = 0.0f;
+                    world.transforms.get(world.player1).position = {250.0f, 300.0f};
+                    world.transforms.get(world.player1).velocity = {0.0f, 0.0f};
+                    respawn1 = 0.0f;
+                }
+            }
+            if (world.states.has(world.player2) && world.states.get(world.player2).currentState == CharacterState::Dead) {
+                respawn2 += fixedDt;
+                if (respawn2 >= 2.0f) {
+                    world.characters.get(world.player2).currentHP = world.characters.get(world.player2).maxHP;
+                    world.states.get(world.player2).currentState = CharacterState::Idle;
+                    world.states.get(world.player2).previousState = CharacterState::Idle;
+                    world.states.get(world.player2).stateTimer = 0.0f;
+                    world.transforms.get(world.player2).position = {750.0f, 300.0f};
+                    world.transforms.get(world.player2).velocity = {0.0f, 0.0f};
+                    respawn2 = 0.0f;
                 }
             }
         }
-        
-        cleanupSystem.update(ecs, deathTags, lifetimes,
-            states, transforms, characters, inputs, hurtboxes,
-            hitboxes, attackStates, damageTags,
-            lootDrops, itemDatas, pickupBoxes,
-            magnets, evolutions, dashes,
-            bombs, attachedComponents, colliders,
-            zTransforms,
-            damageTexts,
-            TIME_PER_FRAME.asSeconds());
-        
-        // --- 循环外：纯渲染 ---
-        window.clear(COLOR_BACKGROUND);
-        
-        // ========== 空间法则：Camera Shake 屏幕震动 ==========
-        sf::View view = window.getDefaultView();
-        
-        if (juice.shakeTimer > 0.0f) {
-            juice.shakeTimer -= realDt;  // 震动不受游戏时间静止影响
-            
-            // 生成随机偏移 (-intensity 到 +intensity)
-            float offsetX = ((std::rand() % 200) / 100.0f - 1.0f) * juice.shakeIntensity;
-            float offsetY = ((std::rand() % 200) / 100.0f - 1.0f) * juice.shakeIntensity;
-            
-            view.move(sf::Vector2f{offsetX, offsetY});
-            
-            // 震动强度快速衰减（让震动有爆发感）
-            juice.shakeIntensity *= 0.9f;
+
+        cleanupSystem.update(world, TIME_PER_FRAME.asSeconds());
+
+        // --- 渲染 ---
+        renderSystem.update(world, window, font, TIME_PER_FRAME.asSeconds(),
+            /* colorPlayer2 */ sf::Color(255, 165, 0)); // P2 琥珀色，区别于红色敌人
+
+        // ========== ImGui 渲染 ==========
+        static int renderCounter = 0;
+        if (renderCounter++ % 120 == 0) {
+            std::cout << "[ImGui-Render] Calling ImGui::SFML::Render (showPanel=" << (showImGuiPanel ? "true" : "false")
+                      << ")" << std::endl;
         }
-        
-        window.setView(view);
-        
-        renderGrid(window);
-        
-        std::vector<Entity> renderOrder;
-        for (Entity entity : characters.entityList()) {
-            if (transforms.has(entity) && states.has(entity)) {
-                renderOrder.push_back(entity);
-            }
-        }
-        
-        std::sort(renderOrder.begin(), renderOrder.end(), [&transforms](Entity a, Entity b) {
-            return transforms.get(a).position.y < transforms.get(b).position.y;
-        });
-        
-        for (Entity entity : renderOrder) {
-            bool isPlayer = (entity == player);
-            const DashComponent* dashPtr = dashes.has(entity) ? &dashes.get(entity) : nullptr;
-            const ZTransformComponent* zPtr = zTransforms.has(entity) ? &zTransforms.get(entity) : nullptr;
-            
-            renderEntity(window, transforms.get(entity), characters.get(entity), states.get(entity), isPlayer, dashPtr, zPtr);
-        }
-        
-        renderHitboxes(window, transforms, hitboxes, zTransforms);
-        renderLoot(window, transforms, itemDatas);
-        renderBombs(window, transforms, bombs, zTransforms);
-        damageTextRenderSystem.update(damageTexts, window, font, ecs, TIME_PER_FRAME.asSeconds());
-        
-        // 恢复默认视图，防止 UI 和提示文字也跟着震动！
-        window.setView(window.getDefaultView());
-        
-        // ========== UI 帮助面板渲染（动态菜单）==========
-        if (showHelpUI) {
-            // 1. 画半透明黑色背景板（加大尺寸容纳菜单）
-            sf::RectangleShape overlay({420.0f, 400.0f});
-            overlay.setPosition(sf::Vector2f(10.0f, 10.0f));
-            overlay.setFillColor(sf::Color(0, 0, 0, 200));
-            overlay.setOutlineColor(sf::Color(255, 255, 255, 255));
-            overlay.setOutlineThickness(2.0f);
-            window.draw(overlay);
-            
-            // 2. 画标题
-            sf::Text titleText(font, "--- Settings: Key Bindings ---", 18);
-            titleText.setFillColor(sf::Color::Cyan);
-            titleText.setPosition({20.0f, 20.0f});
-            window.draw(titleText);
-            
-            // 3. 循环画每一行按键配置（逐行渲染实现高亮）
-            float startY = 60.0f;
-            for (size_t i = 0; i < bindableActions.size(); ++i) {
-                GameAction action = bindableActions[i];
-                bool isSelected = (static_cast<int>(i) == selectedMenuIndex);
-                
-                std::string rowText = isSelected ? "> " : "  "; // 选中行前面加箭头
-                rowText += actionNames[action] + " : ";
-                
-                // 如果正在修改当前行，显示闪烁提示
-                if (isSelected && isRebinding) {
-                    // 闪烁效果：根据时间切换显示
-                    float blinkSpeed = 8.0f;
-                    float alpha = std::sin(clock.getElapsedTime().asSeconds() * blinkSpeed);
-                    if (alpha > 0) {
-                        rowText += "[ PRESS ANY KEY... ]";
-                    } else {
-                        rowText += "[                 ]";
-                    }
-                } else {
-                    rowText += "[" + inputManager.keyToString(inputManager.getMappedKey(action)) + "]";
-                }
-                
-                sf::Text itemText(font, rowText, 16);
-                itemText.setPosition({20.0f, startY + static_cast<float>(i) * 28.0f});
-                
-                // 选中行显示黄色，否则白色
-                itemText.setFillColor(isSelected ? sf::Color::Yellow : sf::Color::White);
-                window.draw(itemText);
-            }
-            
-            // 4. 画底部操作提示
-            sf::Text hintText(font, "Use W/S or ↑/↓ to select | ENTER to rebind | ESC to cancel | F1 to close", 13);
-            hintText.setFillColor(sf::Color(150, 150, 150));
-            hintText.setPosition({20.0f, startY + static_cast<float>(bindableActions.size()) * 28.0f + 25.0f});
-            window.draw(hintText);
-        }
-        
+        ImGui::SFML::Render(window);
+
         window.display();
-        
-        if (debugClock.getElapsedTime().asSeconds() >= 1.0f) {
-            const auto& evolution = evolutions.get(player);
-            float playerZ = zTransforms.has(player) ? zTransforms.get(player).z : 0.0f;
-            std::cout << "Player HP: " << characters.get(player).currentHP
-                      << " | Evo Points: " << evolution.evolutionPoints
-                      << " | State: " << stateToString(states.get(player).currentState)
-                      << " | Z-Height: " << playerZ
-                      << " | Loots: " << itemDatas.entityList().size()
-                      << " | Juice: timeScale=" << juice.timeScale 
-                      << " shake=" << juice.shakeIntensity 
-                      << " hitStop=" << juice.hitStopTimer << "\n";
-            debugClock.restart();
-        }
     }
-    
+
+    // 退出前保存配置
+    world.inputManager.saveConfig();
+
+    ImGui::SFML::Shutdown();
+
     return 0;
 }
