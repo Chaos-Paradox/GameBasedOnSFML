@@ -9,7 +9,8 @@ enum class CharacterState : uint8_t {
     Dash,       // 冲刺
     Hurt,       // 受伤
     Dead,       // 死亡
-    KnockedAirborne,  // ← 新增：击飞浮空（硬控状态）
+    KnockedAirborne,  // 击飞浮空（硬控状态）
+    Recovery,   // Dash 后摇（无法输入）
 };
 
 /**

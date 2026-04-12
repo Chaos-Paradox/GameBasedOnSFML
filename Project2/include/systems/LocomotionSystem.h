@@ -21,7 +21,8 @@ public:
                 state.currentState == CharacterState::Attack ||
                 state.currentState == CharacterState::Hurt ||
                 state.currentState == CharacterState::Dead ||
-                state.currentState == CharacterState::KnockedAirborne) {
+                state.currentState == CharacterState::KnockedAirborne ||
+                state.currentState == CharacterState::Recovery) {
                 continue;
             }
 

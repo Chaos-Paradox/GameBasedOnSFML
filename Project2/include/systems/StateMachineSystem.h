@@ -33,7 +33,8 @@ public:
             if (world.inputs.has(entity) && input.intentTimer > 0.0f) {
                 if (state.currentState != CharacterState::Hurt &&
                     state.currentState != CharacterState::Dead &&
-                    state.currentState != CharacterState::Dash) {
+                    state.currentState != CharacterState::Dash &&
+                    state.currentState != CharacterState::Recovery) {
                     input.intentTimer -= dt;
                     if (input.intentTimer < 0.0f) {
                         input.intentTimer = 0.0f;
@@ -49,7 +50,8 @@ public:
             if (state.currentState == CharacterState::Dash ||
                 state.currentState == CharacterState::Hurt ||
                 state.currentState == CharacterState::Dead ||
-                state.currentState == CharacterState::KnockedAirborne) {
+                state.currentState == CharacterState::KnockedAirborne ||
+                state.currentState == CharacterState::Recovery) {
                 canBeInterrupted = false;
             }
 

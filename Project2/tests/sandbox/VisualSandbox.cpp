@@ -298,8 +298,15 @@ bool isActionPressed(const InputManager& input, PlayerIndex player, GameAction a
 }
 
 // ========== 渲染配置 ==========
-constexpr int WINDOW_WIDTH = 1024;
-constexpr int WINDOW_HEIGHT = 768;
+constexpr int WINDOW_WIDTH = 1600;
+constexpr int WINDOW_HEIGHT = 900;
+
+// ========== 地图 & 围栏 ==========
+constexpr float MAP_WIDTH  = 2000.0f;
+constexpr float MAP_HEIGHT = 1200.0f;
+constexpr float FENCE_RADIUS = 20.0f;
+constexpr float FENCE_SPACING = FENCE_RADIUS * 1.6f;
+
 constexpr float ENTITY_SIZE = 40.0f;
 
 sf::Color COLOR_PLAYER(50, 200, 50);
@@ -389,11 +396,46 @@ void placeBomb(GameWorld& world, Entity owner, const InputCommand& input) {
         } else { fx = 1.0f; fy = 0.0f; }
     }
     float ox = fx * 35.0f, oy = fy * 35.0f;
-    world.transforms.add(bomb, { .position = {ownerTrans.position.x + ox, ownerTrans.position.y + oy},
+    float spawnX = ownerTrans.position.x + ox;
+    float spawnY = ownerTrans.position.y + oy;
+    world.transforms.add(bomb, { .position = {spawnX, spawnY},
         .scale = {1.0f, 1.0f}, .rotation = 0.0f, .velocity = {0.0f, 0.0f}, .facingX = fx, .facingY = fy });
-    world.bombs.add(bomb, { .fuseTimer = 3.0f, .isKicked = false });
+    world.bombs.add(bomb, { .fuseTimer = 3.0f, .isKicked = false, .lastPosX = spawnX, .lastPosY = spawnY });
     world.zTransforms.add(bomb, { .z = 20.0f, .vz = 300.0f, .gravity = -1500.0f, .height = 30.0f });
     world.colliders.add(bomb, { .radius = 12.0f, .isStatic = false, .mass = 1.0f });
+}
+
+// ========== 围栏工厂 ==========
+void createFence(GameWorld& world) {
+    float fenceRadius = FENCE_RADIUS;
+    float spacing = FENCE_SPACING;
+
+    // 水平围栏：走满地图宽度
+    auto addRow = [&](float y, float xStart, float xEnd) {
+        for (float x = xStart; x <= xEnd + 0.5f; x += spacing) {
+            Entity ball = world.ecs.create();
+            world.transforms.add(ball, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, 1.0f, 0.0f});
+            world.colliders.add(ball, {fenceRadius, true, 99999.0f});
+            world.fenceBalls.push_back(ball);
+        }
+    };
+
+    // 垂直围栏：两端缩进 fenceRadius 避免和水平围栏角重叠
+    auto addCol = [&](float x, float yStart, float yEnd) {
+        for (float y = yStart; y <= yEnd + 0.5f; y += spacing) {
+            Entity ball = world.ecs.create();
+            world.transforms.add(ball, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, 1.0f, 0.0f});
+            world.colliders.add(ball, {fenceRadius, true, 99999.0f});
+            world.fenceBalls.push_back(ball);
+        }
+    };
+
+    // 顶部 & 底部
+    addRow(0.0f, 0.0f, MAP_WIDTH);
+    addRow(MAP_HEIGHT, 0.0f, MAP_WIDTH);
+    // 左侧 & 右侧（缩进）
+    addCol(0.0f, fenceRadius, MAP_HEIGHT - fenceRadius);
+    addCol(MAP_WIDTH, fenceRadius, MAP_HEIGHT - fenceRadius);
 }
 
 // ========== 改键状态机（ImGui 用） ==========
@@ -467,8 +509,11 @@ int main() {
         font.openFromFile("/System/Library/Fonts/Helvetica.ttc");
     }
 
-    world.player1 = createPlayer(world, 250, 300);
-    world.player2 = createPlayer(world, 750, 300);
+    world.player1 = createPlayer(world, 500, 600);
+    world.player2 = createPlayer(world, 1500, 600);
+
+    // 创建围栏
+    createFence(world);
 
     const sf::Time TIME_PER_FRAME = sf::seconds(1.0f / 60.0f);
     sf::Time timeSinceLastUpdate = sf::Time::Zero;
@@ -492,7 +537,77 @@ int main() {
     // 用于检测 P2 手柄连接的变量
     bool lastP2JoystickConnected = sf::Joystick::isConnected(0);
 
+    // ========== 动态相机状态（大乱斗风格） ==========
+    // 初始位置为玩家出生点中点: P1(500,600) + P2(1500,600) → (1000,600)
+    static sf::Vector2f currentCameraCenter{1000.0f, 600.0f};
+    static float currentCameraSize = 1200.0f;
+
+    // 重置时钟，避免从 clock 初始化到进入主循环之间的 accumulated time spike
+    clock.restart();
+
     while (window.isOpen()) {
+        // ========== 动态相机计算（在 pollEvent 之前设置 view） ==========
+        {
+            float cameraDt = clock.getElapsedTime().asSeconds();
+            if (cameraDt > 0.1f) cameraDt = 0.1f; // cap initial spike
+            if (cameraDt <= 0.0f) cameraDt = 1.0f / 144.0f;
+
+            std::vector<sf::Vector2f> alivePositions;
+
+            auto collectAlive = [&](Entity player) {
+                if (world.states.has(player) && world.transforms.has(player)) {
+                    auto& state = world.states.get(player);
+                    if (state.currentState != CharacterState::Dead) {
+                        auto& tr = world.transforms.get(player);
+                        alivePositions.emplace_back(tr.position.x, tr.position.y);
+                    }
+                }
+            };
+            collectAlive(world.player1);
+            collectAlive(world.player2);
+
+            sf::Vector2f targetCenter{1000.0f, 600.0f};
+            float targetSize = 1200.0f;
+
+            if (alivePositions.size() == 1) {
+                // 单人存活：锁定玩家，固定视野
+                targetCenter = alivePositions[0];
+                targetSize = 800.0f;
+            } else if (alivePositions.size() >= 2) {
+                // 双人存活：计算包围盒
+                float minX = alivePositions[0].x, maxX = alivePositions[0].x;
+                float minY = alivePositions[0].y, maxY = alivePositions[0].y;
+                for (const auto& p : alivePositions) {
+                    if (p.x < minX) minX = p.x;
+                    if (p.x > maxX) maxX = p.x;
+                    if (p.y < minY) minY = p.y;
+                    if (p.y > maxY) maxY = p.y;
+                }
+                float width = maxX - minX;
+                float height = maxY - minY;
+                targetCenter = sf::Vector2f((minX + maxX) / 2.0f, (minY + maxY) / 2.0f);
+                float aspectHeight = height * 16.0f / 9.0f;
+                targetSize = std::max(width, aspectHeight) + 300.0f;
+            }
+
+            // 限制 targetSize 范围
+            targetSize = std::clamp(targetSize, 600.0f, 2000.0f);
+
+            // lerp 平滑过渡
+            float lerpSpeed = 5.0f * cameraDt;
+            float t = std::clamp(lerpSpeed, 0.0f, 1.0f);
+            currentCameraCenter.x += (targetCenter.x - currentCameraCenter.x) * t;
+            currentCameraCenter.y += (targetCenter.y - currentCameraCenter.y) * t;
+            currentCameraSize += (targetSize - currentCameraSize) * t;
+
+            // 应用 view
+            float viewHeight = static_cast<float>(WINDOW_HEIGHT) / static_cast<float>(WINDOW_WIDTH) * currentCameraSize;
+            sf::View dynamicView;
+            dynamicView.setCenter(currentCameraCenter);
+            dynamicView.setSize({currentCameraSize, viewHeight});
+            window.setView(dynamicView);
+        }
+
         // ========== 事件处理 ==========
         while (const auto event = window.pollEvent()) {
             // ========== ImGui 事件处理（最高优先级） ==========
@@ -980,6 +1095,9 @@ int main() {
         // --- 渲染 ---
         renderSystem.update(world, window, font, TIME_PER_FRAME.asSeconds(),
             /* colorPlayer2 */ sf::Color(255, 165, 0)); // P2 琥珀色，区别于红色敌人
+
+        // 切回默认 view（ImGui 需要像素坐标）
+        window.setView(window.getDefaultView());
 
         // ========== ImGui 渲染 ==========
         static int renderCounter = 0;

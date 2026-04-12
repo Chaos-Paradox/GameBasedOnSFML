@@ -13,4 +13,6 @@
 struct BombComponent {
     float fuseTimer{3.0f};    // 引信倒计时（秒）
     bool isKicked{false};     // 是否被踢飞
+    float lastPosX{0.0f};     // 上一帧位置（用于 CCD 连续碰撞检测）
+    float lastPosY{0.0f};
 };

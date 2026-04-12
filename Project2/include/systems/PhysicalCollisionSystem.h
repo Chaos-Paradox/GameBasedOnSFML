@@ -28,6 +28,18 @@ public:
                 auto& colliderB = world.colliders.get(entityB);
                 auto& transformB = world.transforms.get(entityB);
 
+                // 炸弹被 Dash 踢飞时，跳过 PhysicalCollisionSystem 的处理
+                // 只由 BombSystem 的 CCD 处理，避免物理推开干扰连续踢
+                bool aIsBomb = world.bombs.has(entityA);
+                bool bIsBomb = world.bombs.has(entityB);
+                if (aIsBomb || bIsBomb) {
+                    bool aIsDashing = world.states.has(entityA) &&
+                                      world.states.get(entityA).currentState == CharacterState::Dash;
+                    bool bIsDashing = world.states.has(entityB) &&
+                                      world.states.get(entityB).currentState == CharacterState::Dash;
+                    if (aIsDashing || bIsDashing) continue;
+                }
+
                 float dx = transformB.position.x - transformA.position.x;
                 float dy = transformB.position.y - transformA.position.y;
                 float dist = std::sqrt(dx * dx + dy * dy);

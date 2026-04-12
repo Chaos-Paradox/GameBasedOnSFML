@@ -67,7 +67,8 @@ public:
         window.clear(COLOR_BACKGROUND);
 
         // ========== Camera Shake ==========
-        sf::View view = window.getDefaultView();
+        // 获取当前 view（可能是动态相机设置的），而不是用 defaultView 覆盖它
+        sf::View view = window.getView();
         auto& juice = world.juice;
 
         if (juice.shakeTimer > 0.0f) {
@@ -85,6 +86,9 @@ public:
 
         // ========== 网格背景 ==========
         renderGrid(window);
+
+        // ========== 围栏 ==========
+        renderFence(window, world);
 
         // ========== 收集所有可渲染实体 ==========
         std::vector<Entity> renderQueue;
@@ -337,25 +341,89 @@ private:
         }
     }
 
-    void renderGrid(sf::RenderWindow& window) {
-        const int gridSize = 50;
-        const int width = 1280;
-        const int height = 720;
+    void renderFence(sf::RenderWindow& window, GameWorld& world) {
+        // 用围栏碰撞球计算围墙边界
+        float minX = 0.0f, minY = 0.0f, maxX = 0.0f, maxY = 0.0f;
+        bool first = true;
+        for (Entity entity : world.fenceBalls) {
+            if (!world.transforms.has(entity)) continue;
+            const auto& trans = world.transforms.get(entity);
+            float r = world.colliders.has(entity) ? world.colliders.get(entity).radius : 20.0f;
+            float left = trans.position.x - r;
+            float right = trans.position.x + r;
+            float top = trans.position.y - r;
+            float bottom = trans.position.y + r;
+            if (first) {
+                minX = left; minY = top; maxX = right; maxY = bottom;
+                first = false;
+            } else {
+                if (left < minX) minX = left;
+                if (top < minY) minY = top;
+                if (right > maxX) maxX = right;
+                if (bottom > maxY) maxY = bottom;
+            }
+        }
+        if (first) return; // no fence balls
 
-        for (int x = 0; x <= width; x += gridSize) {
+        const float wallThickness = 12.0f;
+        sf::Color wallFill(60, 60, 80, 200);
+        sf::Color wallStroke(100, 100, 130, 220);
+
+        // 上围墙
+        sf::RectangleShape topWall({maxX - minX, wallThickness});
+        topWall.setPosition({minX, minY});
+        topWall.setFillColor(wallFill);
+        topWall.setOutlineColor(wallStroke);
+        topWall.setOutlineThickness(2.0f);
+        window.draw(topWall);
+
+        // 下围墙
+        sf::RectangleShape bottomWall({maxX - minX, wallThickness});
+        bottomWall.setPosition({minX, maxY - wallThickness});
+        bottomWall.setFillColor(wallFill);
+        bottomWall.setOutlineColor(wallStroke);
+        bottomWall.setOutlineThickness(2.0f);
+        window.draw(bottomWall);
+
+        // 左围墙
+        sf::RectangleShape leftWall({wallThickness, maxY - minY});
+        leftWall.setPosition({minX, minY});
+        leftWall.setFillColor(wallFill);
+        leftWall.setOutlineColor(wallStroke);
+        leftWall.setOutlineThickness(2.0f);
+        window.draw(leftWall);
+
+        // 右围墙
+        sf::RectangleShape rightWall({wallThickness, maxY - minY});
+        rightWall.setPosition({maxX - wallThickness, minY});
+        rightWall.setFillColor(wallFill);
+        rightWall.setOutlineColor(wallStroke);
+        rightWall.setOutlineThickness(2.0f);
+        window.draw(rightWall);
+    }
+
+    void renderGrid(sf::RenderWindow& window) {
+        const int gridSize = 100;
+        // 网格覆盖 2000x1200 地图
+        const int gridMinX = 0;
+        const int gridMinY = 0;
+        const int gridMaxX = 2000;
+        const int gridMaxY = 1200;
+
+        for (int x = gridMinX; x <= gridMaxX; x += gridSize) {
             sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-            line[0].position = sf::Vector2f(x, 0);
+            line[0].position = sf::Vector2f(x, gridMinY);
             line[0].color = sf::Color(100, 100, 120, 100);
-            line[1].position = sf::Vector2f(x, height);
+            line[1].position = sf::Vector2f(x, gridMaxY);
             line[1].color = sf::Color(100, 100, 120, 100);
             window.draw(line);
         }
 
-        for (int y = 0; y <= height; y += gridSize) {
+        for (int y = gridMinY; y <= gridMaxY; y += gridSize) {
             sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-            line[0].position = sf::Vector2f(0, y);
+            line[0].position = sf::Vector2f(gridMinX, y);
             line[0].color = sf::Color(100, 100, 120, 100);
-            line[1].position = sf::Vector2f(width, y);
+            line[1].position = sf::Vector2f(gridMaxX, y);
             line[1].color = sf::Color(100, 100, 120, 100);
             window.draw(line);
         }

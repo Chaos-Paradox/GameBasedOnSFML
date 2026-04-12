@@ -2,6 +2,7 @@
 #include "core/ECS.h"
 #include "core/GameJuice.h"
 #include "core/InputManager.h"
+#include <vector>
 
 // 所有组件
 #include "components/StateMachine.h"
@@ -73,4 +74,7 @@ struct GameWorld {
     // ========== 玩家实体引用 ==========
     Entity player1{INVALID_ENTITY};
     Entity player2{INVALID_ENTITY};
+
+    // ========== 围栏实体引用（渲染用） ==========
+    std::vector<Entity> fenceBalls;
 };

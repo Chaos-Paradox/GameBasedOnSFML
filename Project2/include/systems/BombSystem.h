@@ -20,6 +20,10 @@ public:
             auto& transform = world.transforms.get(bomb);
             auto& zTrans = world.zTransforms.get(bomb);
 
+
+            // 重置踢飞标记（每帧刷新，允许被任何 Dash 玩家反复踢）
+            bombComp.isKicked = false;
+
             // 引信倒计时
             bombComp.fuseTimer -= dt;
 
@@ -82,7 +86,10 @@ public:
                 transform.velocity.y *= 0.8f;
             }
 
-            // Dash 碰撞踢飞检测
+            // Dash 碰撞踢飞检测（CCD 连续碰撞检测）
+            // 如果上一帧已被踢飞，跳过检测（防止被同一/其他玩家反复踢）
+            if (bombComp.isKicked) goto skipKick;
+            bombComp.isKicked = false; // 重置标记，允许本帧检测
             auto charEntities = world.characters.entityList();
             for (Entity player : charEntities) {
                 if (!world.states.has(player) || !world.transforms.has(player) || !world.zTransforms.has(player)) continue;
@@ -91,13 +98,34 @@ public:
                 const auto& playerTrans = world.transforms.get(player);
                 const auto& playerZTrans = world.zTransforms.get(player);
 
-                if (playerState.currentState != CharacterState::Dash || bombComp.isKicked) continue;
+                if (playerState.currentState != CharacterState::Dash) continue;
 
-                float dx = playerTrans.position.x - transform.position.x;
-                float dy = playerTrans.position.y - transform.position.y;
-                float distance = std::sqrt(dx * dx + dy * dy);
+                // 点到线段最短距离（CCD）
+                float startX = bombComp.lastPosX;
+                float startY = bombComp.lastPosY;
+                float endX = transform.position.x;
+                float endY = transform.position.y;
+                float lineVecX = endX - startX;
+                float lineVecY = endY - startY;
+                float lineLenSq = lineVecX * lineVecX + lineVecY * lineVecY;
 
-                if (distance >= 40.0f) continue;
+                float distX, distY;
+                if (lineLenSq < 0.001f) {
+                    // 炸弹几乎未移动，退化为点-点检测
+                    distX = playerTrans.position.x - endX;
+                    distY = playerTrans.position.y - endY;
+                } else {
+                    float t = ((playerTrans.position.x - startX) * lineVecX +
+                               (playerTrans.position.y - startY) * lineVecY) / lineLenSq;
+                    t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+                    float closestX = startX + t * lineVecX;
+                    float closestY = startY + t * lineVecY;
+                    distX = playerTrans.position.x - closestX;
+                    distY = playerTrans.position.y - closestY;
+                }
+
+                float distance = std::sqrt(distX * distX + distY * distY);
+                if (distance >= 60.0f) continue;
 
                 float playerBottom = playerZTrans.z;
                 float playerTop = playerZTrans.z + playerZTrans.height;
@@ -143,9 +171,8 @@ public:
 
                 std::cout << "[Bomb] ⚽ 被踢飞！velocity=(" << transform.velocity.x
                           << ", " << transform.velocity.y << ")\n";
-
-                break;
             }
+
         }
     }
 };
