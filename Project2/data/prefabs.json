@@ -1,0 +1,103 @@
+{
+  "Player": {
+    "character": {
+      "name": "Player",
+      "level": 1,
+      "maxHP": 100,
+      "baseAttack": 10,
+      "baseDefense": 5,
+      "baseMoveSpeed": 200.0
+    },
+    "hurtbox": {
+      "radius": 18.0,
+      "height": 45.0,
+      "zOffset": 0.0,
+      "faction": "Player",
+      "layer": 1
+    },
+    "dash": {
+      "dashSpeed": 2000.0,
+      "dashDuration": 0.1,
+      "iframeDuration": 0.1,
+      "recoveryDuration": 0.0,
+      "maxCharges": 2,
+      "rechargeCooldown": 1.0
+    },
+    "magnet": {
+      "magnetRadius": 150.0,
+      "magnetSpeed": 400.0
+    },
+    "zTransform": {
+      "gravity": -2000.0,
+      "height": 40.0
+    },
+    "collider": {
+      "radius": 20.0
+    },
+    "momentum": {
+      "mass": 100.0
+    }
+  },
+
+  "Dummy": {
+    "character": {
+      "name": "Dummy",
+      "level": 1,
+      "maxHP": 100,
+      "baseAttack": 10,
+      "baseDefense": 0,
+      "baseMoveSpeed": 0.0
+    },
+    "hurtbox": {
+      "radius": 18.0,
+      "height": 45.0,
+      "zOffset": 0.0,
+      "faction": "Enemy",
+      "layer": 2
+    },
+    "zTransform": {
+      "gravity": -2000.0,
+      "height": 40.0
+    },
+    "collider": {
+      "radius": 20.0
+    },
+    "momentum": {
+      "mass": 100.0
+    },
+    "lootDrop": {
+      "entries": [
+        { "itemId": 1, "dropChance": 1.0, "minCount": 1, "maxCount": 1 }
+      ]
+    }
+  },
+
+  "StandardBomb": {
+    "bomb": {
+      "fuseTimer": 3.0,
+      "spawnOffset": 35.0
+    },
+    "zTransform": {
+      "initialZ": 20.0,
+      "initialVZ": 300.0,
+      "gravity": -1500.0,
+      "height": 30.0
+    },
+    "collider": {
+      "radius": 12.0
+    },
+    "momentum": {
+      "mass": 10.0,
+      "useCCD": true
+    },
+    "explosion": {
+      "radius": 150.0,
+      "damageMultiplier": 100,
+      "knockbackForce": 500.0,
+      "knockbackXY": 2000.0,
+      "knockbackZ": 800.0,
+      "height": 500.0
+    },
+    "explosionLifetime": 0.1
+  }
+}

@@ -42,8 +42,8 @@ make
 
 ```bash
 cd Project2
-cmake --build build_sfml --target loot_pipeline_test
-./build_sfml/test/loot_pipeline_test
+cmake --build build --target loot_pipeline_test
+./build/test/loot_pipeline_test
 ```
 
 ### Legacy standalone tests (in `Project2/test/`, all commented out currently)

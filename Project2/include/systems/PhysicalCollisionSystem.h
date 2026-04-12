@@ -4,7 +4,15 @@
 #include <iostream>
 
 /**
- * @brief 物理碰撞系统（圆柱体排斥）
+ * @brief 物理碰撞系统（圆柱体排斥 + CCD 连续碰撞检测）
+ *
+ * 质量数据来源：MomentumComponent::mass（不再从 ColliderComponent 读取）
+ * 速度数据来源：优先使用 MomentumComponent::velocity，回退到 TransformComponent::velocity
+ *
+ * CCD 连续碰撞检测：
+ *   - 对 useCCD=true 的高速实体（如炸弹），用 prevPos → currentPos 轨迹做射线检测
+ *   - 检测轨迹上与静态碰撞体的最近点，如果距离 < radiusA + radiusB 则判定碰撞
+ *   - 碰撞后将实体推回到碰撞点，防止隧穿
  */
 class PhysicalCollisionSystem {
 public:
@@ -12,6 +20,18 @@ public:
     {
         (void)dt;
 
+        // ========== 记录上一帧位置（用于 CCD） ==========
+        auto momentumEntities = world.momentums.entityList();
+        for (Entity e : momentumEntities) {
+            if (world.momentums.has(e) && world.transforms.has(e)) {
+                auto& mom = world.momentums.get(e);
+                auto& trans = world.transforms.get(e);
+                mom.prevPosX = trans.position.x;
+                mom.prevPosY = trans.position.y;
+            }
+        }
+
+        // ========== 常规碰撞检测（离散） ==========
         auto colliderEntities = world.colliders.entityList();
 
         for (size_t i = 0; i < colliderEntities.size(); ++i) {
@@ -59,6 +79,12 @@ public:
                 float dirX = dx * invDist;
                 float dirY = dy * invDist;
 
+                // 质量从 MomentumComponent 读取
+                float massA = 1.0f;
+                float massB = 1.0f;
+                if (world.momentums.has(entityA)) massA = world.momentums.get(entityA).mass;
+                if (world.momentums.has(entityB)) massB = world.momentums.get(entityB).mass;
+
                 if (colliderA.isStatic && colliderB.isStatic) {
                     continue;
                 }
@@ -73,9 +99,9 @@ public:
                     std::cout << "[Physics] Static collision: A pushed by " << overlap << "\n";
                 }
                 else {
-                    float totalMass = colliderA.mass + colliderB.mass;
-                    float ratioA = colliderB.mass / totalMass;
-                    float ratioB = colliderA.mass / totalMass;
+                    float totalMass = massA + massB;
+                    float ratioA = massB / totalMass;
+                    float ratioB = massA / totalMass;
 
                     transformA.position.x -= dirX * overlap * ratioA;
                     transformA.position.y -= dirY * overlap * ratioA;
@@ -85,29 +111,140 @@ public:
                     std::cout << "[Physics] Dynamic collision (mass): A moves " << (overlap * ratioA)
                               << ", B moves " << (overlap * ratioB) << "\n";
 
-                    float relVelX = transformA.velocity.x - transformB.velocity.x;
-                    float relVelY = transformA.velocity.y - transformB.velocity.y;
+                    // 速度从 MomentumComponent 读取，回退到 TransformComponent
+                    Vec2 velA = world.momentums.has(entityA) ? world.momentums.get(entityA).velocity
+                                                             : transformA.velocity;
+                    Vec2 velB = world.momentums.has(entityB) ? world.momentums.get(entityB).velocity
+                                                             : transformB.velocity;
+
+                    float relVelX = velA.x - velB.x;
+                    float relVelY = velA.y - velB.y;
                     float velocityAlongNormal = relVelX * dirX + relVelY * dirY;
 
                     if (velocityAlongNormal > 0) continue;
 
                     float e = 0.5f;
                     float j = -(1.0f + e) * velocityAlongNormal;
-                    j /= (1.0f / colliderA.mass + 1.0f / colliderB.mass);
+                    j /= (1.0f / massA + 1.0f / massB);
 
                     float impulseX = j * dirX;
                     float impulseY = j * dirY;
 
-                    if (!colliderA.isStatic) {
-                        transformA.velocity.x += (impulseX / colliderA.mass);
-                        transformA.velocity.y += (impulseY / colliderA.mass);
+                    float newVxA = velA.x + (impulseX / massA);
+                    float newVyA = velA.y + (impulseY / massA);
+                    float newVxB = velB.x - (impulseX / massB);
+                    float newVyB = velB.y - (impulseY / massB);
+
+                    transformA.velocity.x = newVxA;
+                    transformA.velocity.y = newVyA;
+                    transformB.velocity.x = newVxB;
+                    transformB.velocity.y = newVyB;
+
+                    if (world.momentums.has(entityA)) {
+                        world.momentums.get(entityA).velocity = {newVxA, newVyA};
                     }
-                    if (!colliderB.isStatic) {
-                        transformB.velocity.x -= (impulseX / colliderB.mass);
-                        transformB.velocity.y -= (impulseY / colliderB.mass);
+                    if (world.momentums.has(entityB)) {
+                        world.momentums.get(entityB).velocity = {newVxB, newVyB};
                     }
 
                     std::cout << "[Physics] 💥 Momentum impulse! j=" << j << "\n";
+                }
+            }
+        }
+
+        // ========== CCD 连续碰撞检测（防止高速实体隧穿） ==========
+        resolveCCD(world);
+    }
+
+private:
+    /**
+     * @brief CCD 连续碰撞检测
+     *
+     * 对 useCCD=true 的实体，用 prevPos → currentPos 轨迹做线段-圆最近点检测。
+     * 如果轨迹上与静态碰撞体的最近距离 < radiusA + radiusB，则将实体推回到碰撞点。
+     */
+    void resolveCCD(GameWorld& world)
+    {
+        auto momentumEntities = world.momentums.entityList();
+
+        for (Entity entityA : momentumEntities) {
+            if (!world.momentums.has(entityA) || !world.transforms.has(entityA)) continue;
+
+            auto& momA = world.momentums.get(entityA);
+            if (!momA.useCCD) continue;
+
+            auto& transformA = world.transforms.get(entityA);
+
+            // 轨迹线段：prevPos → currentPos
+            float segX = transformA.position.x - momA.prevPosX;
+            float segY = transformA.position.y - momA.prevPosY;
+            float segLenSq = segX * segX + segY * segY;
+
+            // 如果实体几乎没有移动，跳过 CCD
+            if (segLenSq < 0.001f) continue;
+
+            auto colliderEntities = world.colliders.entityList();
+
+            for (Entity entityB : colliderEntities) {
+                if (entityA == entityB) continue;
+                if (!world.colliders.has(entityB)) continue;
+
+                auto& colliderB = world.colliders.get(entityB);
+                // 只需要检测与静态碰撞体的 CCD（围栏等）
+                if (!colliderB.isStatic) continue;
+
+                auto& transformB = world.transforms.get(entityB);
+
+                // 计算线段上离 colliderB 中心最近的点
+                float tx = transformB.position.x - momA.prevPosX;
+                float ty = transformB.position.y - momA.prevPosY;
+                float t = (tx * segX + ty * segY) / segLenSq;
+                t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+
+                float closestX = momA.prevPosX + t * segX;
+                float closestY = momA.prevPosY + t * segY;
+
+                float dx = transformB.position.x - closestX;
+                float dy = transformB.position.y - closestY;
+                float dist = std::sqrt(dx * dx + dy * dy);
+
+                float minDist = colliderB.radius;
+                // 对于动态实体 A，用 MomentumComponent 的 radius 回退
+                float radiusA = 1.0f;
+                if (world.colliders.has(entityA)) {
+                    radiusA = world.colliders.get(entityA).radius;
+                }
+                minDist += radiusA;
+
+                if (dist < minDist && dist > 0.001f) {
+                    // 碰撞！推回到碰撞点
+                    float pushBackX = closestX + (dx / dist) * (minDist - 0.01f);
+                    float pushBackY = closestY + (dy / dist) * (minDist - 0.01f);
+
+                    transformA.position.x = pushBackX;
+                    transformA.position.y = pushBackY;
+
+                    // 速度反射（沿碰撞法线）
+                    float nx = dx / dist;
+                    float ny = dy / dist;
+
+                    Vec2 vel = transformA.velocity;
+                    float dotVN = vel.x * nx + vel.y * ny;
+
+                    // 只反射朝向碰撞体的速度分量
+                    if (dotVN < 0.0f) {
+                        transformA.velocity.x -= 2.0f * dotVN * nx;
+                        transformA.velocity.y -= 2.0f * dotVN * ny;
+
+                        // 同步 momentum 速度
+                        momA.velocity = {transformA.velocity.x, transformA.velocity.y};
+                    }
+
+                    std::cout << "[Physics/CCD] ⚡ Tunneling prevented! entity=" << (uint32_t)entityA
+                              << " pushed to (" << pushBackX << ", " << pushBackY << ")\n";
+
+                    // 一个 CCD 实体每帧只处理一次碰撞
+                    break;
                 }
             }
         }

@@ -26,6 +26,7 @@
 
 // ========== GameWorld ==========
 #include "core/GameWorld.h"
+#include "core/EntityFactory.h"
 
 // ========== 所有系统 ==========
 #include "systems/StateMachineSystem.h"
@@ -328,83 +329,6 @@ std::string stateToString(CharacterState state) {
     }
 }
 
-// ========== 工厂函数 ==========
-
-auto createPlayer(GameWorld& world, float x, float y) {
-    auto player = world.ecs.create();
-    world.states.add(player, {CharacterState::Idle, CharacterState::Idle, 0.0f});
-    world.transforms.add(player, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, 1.0f, 0.0f});
-    world.characters.add(player, {"Player", 1, 100, 100, 10, 5, 200.0f, false, 0.0f, 1.0f, 0.0f});
-    world.inputs.add(player, {{0.0f, 0.0f}, ActionIntent::None, 0.0f});
-    world.hurtboxes.add(player, {
-        .radius = 18.0f, .height = 45.0f, .zOffset = 0.0f,
-        .offset = {0.0f, 0.0f}, .faction = Faction::Player,
-        .layer = 1, .invincibleTime = 0.0f
-    });
-    world.evolutions.add(player, {0, 0});
-    world.dashes.add(player, {
-        .dashSpeed = 2000.0f, .dashDuration = 0.1f,
-        .iframeDuration = 0.1f, .cooldown = 1.0f,
-        .dashTimer = 0.0f, .cooldownTimer = 0.0f,
-        .iframeTimer = 0.0f, .dashDir = {1.0f, 0.0f},
-        .isInvincible = false
-    });
-    world.magnets.add(player, {
-        .magnetRadius = 150.0f, .magnetSpeed = 400.0f
-    });
-    world.zTransforms.add(player, {
-        .z = 0.0f, .vz = 0.0f, .gravity = -2000.0f, .height = 40.0f
-    });
-    world.colliders.add(player, {
-        .radius = 20.0f, .isStatic = false, .mass = 100.0f
-    });
-    return player;
-}
-
-auto createDummy(GameWorld& world, float x, float y) {
-    auto dummy = world.ecs.create();
-    world.states.add(dummy, {CharacterState::Idle, CharacterState::Idle, 0.0f});
-    world.transforms.add(dummy, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, -1.0f, 0.0f});
-    world.characters.add(dummy, {"Dummy", 1, 100, 100, 10, 0, 0.0f, false, 0.0f, -1.0f, 0.0f});
-    world.hurtboxes.add(dummy, {
-        .radius = 18.0f, .height = 45.0f, .zOffset = 0.0f,
-        .offset = {0.0f, 0.0f}, .faction = Faction::Enemy,
-        .layer = 2, .invincibleTime = 0.0f
-    });
-    LootDropComponent dummyLoot;
-    dummyLoot.lootTable[0] = {1, 1.0f, 1, 1};
-    dummyLoot.lootCount = 1;
-    dummyLoot.hasDropped = false;
-    world.lootDrops.add(dummy, dummyLoot);
-    world.colliders.add(dummy, {
-        .radius = 20.0f, .isStatic = false, .mass = 100.0f
-    });
-    world.zTransforms.add(dummy, {
-        .z = 0.0f, .vz = 0.0f, .gravity = -2000.0f, .height = 40.0f
-    });
-    return dummy;
-}
-
-void placeBomb(GameWorld& world, Entity owner, const InputCommand& input) {
-    Entity bomb = world.ecs.create();
-    const auto& ownerTrans = world.transforms.get(owner);
-    float fx = ownerTrans.facingX, fy = ownerTrans.facingY;
-    if (fx == 0.0f && fy == 0.0f) {
-        if (input.moveDir.x != 0.0f || input.moveDir.y != 0.0f) {
-            float len = std::sqrt(input.moveDir.x * input.moveDir.x + input.moveDir.y * input.moveDir.y);
-            fx = input.moveDir.x / len; fy = input.moveDir.y / len;
-        } else { fx = 1.0f; fy = 0.0f; }
-    }
-    float ox = fx * 35.0f, oy = fy * 35.0f;
-    float spawnX = ownerTrans.position.x + ox;
-    float spawnY = ownerTrans.position.y + oy;
-    world.transforms.add(bomb, { .position = {spawnX, spawnY},
-        .scale = {1.0f, 1.0f}, .rotation = 0.0f, .velocity = {0.0f, 0.0f}, .facingX = fx, .facingY = fy });
-    world.bombs.add(bomb, { .fuseTimer = 3.0f, .isKicked = false, .lastPosX = spawnX, .lastPosY = spawnY });
-    world.zTransforms.add(bomb, { .z = 20.0f, .vz = 300.0f, .gravity = -1500.0f, .height = 30.0f });
-    world.colliders.add(bomb, { .radius = 12.0f, .isStatic = false, .mass = 1.0f });
-}
-
 // ========== 围栏工厂 ==========
 void createFence(GameWorld& world) {
     float fenceRadius = FENCE_RADIUS;
@@ -415,7 +339,7 @@ void createFence(GameWorld& world) {
         for (float x = xStart; x <= xEnd + 0.5f; x += spacing) {
             Entity ball = world.ecs.create();
             world.transforms.add(ball, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, 1.0f, 0.0f});
-            world.colliders.add(ball, {fenceRadius, true, 99999.0f});
+            world.colliders.add(ball, {fenceRadius, true});
             world.fenceBalls.push_back(ball);
         }
     };
@@ -425,7 +349,7 @@ void createFence(GameWorld& world) {
         for (float y = yStart; y <= yEnd + 0.5f; y += spacing) {
             Entity ball = world.ecs.create();
             world.transforms.add(ball, {{x, y}, {1.0f, 1.0f}, 0.0f, {0.0f, 0.0f}, 1.0f, 0.0f});
-            world.colliders.add(ball, {fenceRadius, true, 99999.0f});
+            world.colliders.add(ball, {fenceRadius, true});
             world.fenceBalls.push_back(ball);
         }
     };
@@ -509,8 +433,12 @@ int main() {
         font.openFromFile("/System/Library/Fonts/Helvetica.ttc");
     }
 
-    world.player1 = createPlayer(world, 500, 600);
-    world.player2 = createPlayer(world, 1500, 600);
+    // ========== 数据驱动工厂 ==========
+    EntityFactory factory;
+    factory.loadPrefabs("data/prefabs.json");
+
+    world.player1 = factory.spawnPlayer(world, 500, 600);
+    world.player2 = factory.spawnPlayer(world, 1500, 600);
 
     // 创建围栏
     createFence(world);
@@ -594,7 +522,7 @@ int main() {
             targetSize = std::clamp(targetSize, 600.0f, 2000.0f);
 
             // lerp 平滑过渡
-            float lerpSpeed = 5.0f * cameraDt;
+            float lerpSpeed = 12.0f * cameraDt;
             float t = std::clamp(lerpSpeed, 0.0f, 1.0f);
             currentCameraCenter.x += (targetCenter.x - currentCameraCenter.x) * t;
             currentCameraCenter.y += (targetCenter.y - currentCameraCenter.y) * t;
@@ -727,7 +655,7 @@ int main() {
                 if (world.inputManager.getMappedKey(PlayerIndex::P1, GameAction::SpawnDummy) == EngineKey::MouseRight
                     && mb->button == sf::Mouse::Button::Right) {
                     sf::Vector2f worldPos = window.mapPixelToCoords(mb->position);
-                    createDummy(world, worldPos.x, worldPos.y);
+                    factory.spawnDummy(world, worldPos.x, worldPos.y);
                     std::cout << "[SpawnDummy] Dummy created at (" << worldPos.x << ", " << worldPos.y << ")\n";
                 }
             }
@@ -915,7 +843,7 @@ int main() {
             p1BombCD = std::max(0.0f, p1BombCD - realDt);
             bool p1Bomb = isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::DropBomb);
             if (p1Bomb && !lastP1Bomb && p1BombCD <= 0.0f) {
-                placeBomb(world, world.player1, world.inputs.get(world.player1));
+factory.spawnThrowableBomb(world, world.player1, world.inputs.get(world.player1));
                 p1BombCD = 0.5f;
             }
             lastP1Bomb = p1Bomb;
@@ -991,7 +919,7 @@ int main() {
             p2BombCD = std::max(0.0f, p2BombCD - realDt);
             bool p2Bomb = isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::DropBomb);
             if (p2Bomb && !lastP2Bomb && p2BombCD <= 0.0f) {
-                placeBomb(world, world.player2, world.inputs.get(world.player2));
+factory.spawnThrowableBomb(world, world.player2, world.inputs.get(world.player2));
                 p2BombCD = 0.5f;
             }
             lastP2Bomb = p2Bomb;

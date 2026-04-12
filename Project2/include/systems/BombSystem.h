@@ -182,14 +182,14 @@ public:
                     ny /= nLen;
                 }
 
-                // --- 获取质量（从 MomentumComponent 或 ColliderComponent 回退） ---
+                // --- 获取质量（从 MomentumComponent 读取，单一数据源） ---
                 float playerMass = 100.0f;
-                float bombMass = 1.0f;
+                float bombMass = 10.0f;
 
-                if (playerHasMomentum) {
+                if (world.momentums.has(player)) {
                     playerMass = world.momentums.get(player).mass;
                 }
-                if (bombHasMomentum) {
+                if (world.momentums.has(bomb)) {
                     bombMass = world.momentums.get(bomb).mass;
                 }
 
@@ -250,7 +250,6 @@ public:
                     world.momentums.get(bomb).collisionCooldown = 0.1f;
                 } else {
                     world.momentums.add(bomb, {
-                        .mass = bombMass,
                         .velocity = {v2x_new, v2y_new},
                         .collisionCooldown = 0.1f
                     });
@@ -278,6 +277,132 @@ public:
                           << " b_vel=(" << v2x_new << ", " << v2y_new << ")\n";
 
                 // 每个炸弹每帧只允许被一个玩家踢一次
+                break;
+            }
+
+            // ========== 炸弹碰撞玩家（反向检测：炸弹飞行中撞到玩家） ==========
+            // 当炸弹速度足够快时，即使玩家没有 dash，也触发弹性碰撞
+            for (Entity player : charEntities) {
+                if (!world.states.has(player) || !world.transforms.has(player) || !world.zTransforms.has(player)) continue;
+
+                const auto& playerState = world.states.get(player);
+                if (playerState.currentState == CharacterState::Dash) continue; // dash 碰撞已由上方处理
+
+                auto& playerTrans = world.transforms.get(player);
+                const auto& playerZTrans = world.zTransforms.get(player);
+
+                // --- 碰撞冷却检查 ---
+                bool playerHasMomentum = world.momentums.has(player);
+                bool bombHasMomentum = world.momentums.has(bomb);
+
+                if (bombHasMomentum && world.momentums.get(bomb).collisionCooldown > 0.0f) continue;
+
+                // --- 检查炸弹是否足够快（飞行中） ---
+                float bombSpeed = std::sqrt(transform.velocity.x * transform.velocity.x +
+                                            transform.velocity.y * transform.velocity.y);
+                constexpr float minBombSpeed = 100.0f; // 低于此速度不触发碰撞（已落地的炸弹）
+                if (bombSpeed < minBombSpeed) continue;
+
+                // --- AABB 距离检测 ---
+                float dx = transform.position.x - playerTrans.position.x;
+                float dy = transform.position.y - playerTrans.position.y;
+                float distance = std::sqrt(dx * dx + dy * dy);
+
+                constexpr float collisionRadius = 60.0f; // 碰撞判定半径
+                if (distance >= collisionRadius) continue;
+
+                // --- Z 轴高度重叠检查 ---
+                float playerBottom = playerZTrans.z;
+                float playerTop = playerZTrans.z + playerZTrans.height;
+                float bombBottom = zTrans.z;
+                float bombTop = zTrans.z + zTrans.height;
+
+                bool zIntersect = !(playerBottom > bombTop || playerTop < bombBottom);
+                if (!zIntersect) continue;
+
+                // --- 碰撞法线：从炸弹指向玩家 ---
+                float nx = dx;
+                float ny = dy;
+                float nLen = std::sqrt(nx * nx + ny * ny);
+                if (nLen < 0.001f) {
+                    nx = playerTrans.facingX;
+                    ny = playerTrans.facingY;
+                    nLen = std::sqrt(nx * nx + ny * ny);
+                    if (nLen > 0.0f) { nx /= nLen; ny /= nLen; }
+                    else { nx = 1.0f; ny = 0.0f; }
+                } else {
+                    nx /= nLen;
+                    ny /= nLen;
+                }
+
+                // --- 获取质量（从 MomentumComponent 读取，单一数据源） ---
+                float playerMass = 100.0f;
+                float bombMass = 10.0f;
+
+                if (world.momentums.has(player)) {
+                    playerMass = world.momentums.get(player).mass;
+                }
+                if (world.momentums.has(bomb)) {
+                    bombMass = world.momentums.get(bomb).mass;
+                }
+
+                // --- 获取碰撞用速度 ---
+                Vec2 v1 = playerTrans.velocity;
+                Vec2 v2 = transform.velocity;
+
+                // --- 弹性碰撞（沿法线方向） ---
+                float v1n = v1.x * nx + v1.y * ny;
+                float v2n = v2.x * nx + v2.y * ny;
+
+                float v1tx = v1.x - v1n * nx;
+                float v1ty = v1.y - v1n * ny;
+                float v2tx = v2.x - v2n * nx;
+                float v2ty = v2.y - v2n * ny;
+
+                float totalMass = playerMass + bombMass;
+                float v1n_new = ((playerMass - bombMass) * v1n + 2.0f * bombMass * v2n) / totalMass;
+                float v2n_new = ((bombMass - playerMass) * v2n + 2.0f * playerMass * v1n) / totalMass;
+
+                float v1x_new = v1tx + v1n_new * nx;
+                float v1y_new = v1ty + v1n_new * ny;
+                float v2x_new = v2tx + v2n_new * nx;
+                float v2y_new = v2ty + v2n_new * ny;
+
+                // --- 应用结果 ---
+                transform.velocity.x = v2x_new;
+                transform.velocity.y = v2y_new;
+
+                playerTrans.velocity.x = v1x_new;
+                playerTrans.velocity.y = v1y_new;
+
+                // 同步 momentum 速度
+                if (playerHasMomentum) {
+                    world.momentums.get(player).velocity = {v1x_new, v1y_new};
+                }
+                if (bombHasMomentum) {
+                    world.momentums.get(bomb).velocity = {v2x_new, v2y_new};
+                }
+
+                // --- 碰撞冷却 ---
+                if (bombHasMomentum) {
+                    world.momentums.get(bomb).collisionCooldown = 0.1f;
+                } else {
+                    world.momentums.add(bomb, {
+                        .velocity = {v2x_new, v2y_new},
+                        .collisionCooldown = 0.1f
+                    });
+                }
+
+                // 标记为被踢飞
+                bombComp.isKicked = true;
+
+                std::cout << "[Bomb] 💣 炸弹碰撞玩家！p_mass=" << playerMass
+                          << " b_mass=" << bombMass
+                          << " b_speed=" << bombSpeed
+                          << " p_vel=(" << v1x_new << ", " << v1y_new << ")"
+                          << " b_vel=(" << v2x_new << ", " << v2y_new << ")\n";
+
+                // 每个炸弹每帧只允许碰撞一个玩家
                 break;
             }
 

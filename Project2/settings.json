@@ -1,0 +1,30 @@
+{
+    "P1": {
+        "Attack": "J",
+        "Dash / Kick": "Space",
+        "Drop Bomb": "G",
+        "Frame Step": "RBracket",
+        "Jump": "K",
+        "Move Down": "S",
+        "Move Left": "A",
+        "Move Right": "D",
+        "Move Up": "W",
+        "Pause": "P",
+        "Spawn Dummy": "MouseRight",
+        "Toggle Help": "Unknown"
+    },
+    "P2": {
+        "Attack": "Num1",
+        "Dash / Kick": "Num0",
+        "Drop Bomb": "Num3",
+        "Frame Step": "Num9",
+        "Jump": "Num2",
+        "Move Down": "Down",
+        "Move Left": "Left",
+        "Move Right": "Right",
+        "Move Up": "Up",
+        "Pause": "Num7",
+        "Spawn Dummy": "MouseRight",
+        "Toggle Help": "Unknown"
+    }
+}

@@ -27,6 +27,7 @@
 #include "components/AttachedComponent.h"
 #include "components/BombComponent.h"
 #include "components/DamageTextComponent.h"
+#include "components/MomentumComponent.h"
 
 /**
  * @brief 游戏世界上下文
@@ -64,6 +65,7 @@ struct GameWorld {
     ComponentStore<AttachedComponent>       attachedComponents;
     ComponentStore<BombComponent>           bombs;
     ComponentStore<DamageTextComponent>     damageTexts;
+    ComponentStore<MomentumComponent>       momentums;
 
     // ========== 全局状态 ==========
     GameJuice juice;

@@ -4,13 +4,18 @@
 #include <iostream>
 
 /**
- * @brief 冲刺系统
+ * @brief 冲刺系统（充能模式）
  *
- * 速度曲线设计：
+ * 充能设计：
+ *   1. 最多存储 maxCharges 次充能（默认 2）
+ *   2. 每次 Dash 消耗 1 次充能
+ *   3. 充能按 rechargeCooldown 自动恢复
+ *   4. 充能未满时持续恢复，最多到 maxCharges
+ *
+ * 速度曲线：
  *   1. 无敌帧期间（iframeTimer > 0）：保持 dashSpeed 最高速度，不衰减
  *   2. 无敌帧结束后（iframeTimer <= 0）：按指数摩擦衰减
- *   3. dashTimer 归零后进入后摇（Recovery），期间无法输入
- *   4. 后摇结束后回到 Idle
+ *   3. dashTimer 归零后直接回到 Idle（无后摇）
  */
 class DashSystem {
 public:
@@ -37,7 +42,8 @@ public:
                                      world.inputs.get(entity).pendingIntent == ActionIntent::Dash &&
                                      world.inputs.get(entity).intentTimer > 0.0f;
 
-                if (hasDashIntent && dash.cooldownTimer <= 0.0f) {
+                // 充能模式：currentCharges > 0 才能启动
+                if (hasDashIntent && dash.currentCharges > 0) {
                     // 计算冲刺方向
                     if (transform.facingX != 0.0f || transform.facingY != 0.0f) {
                         float length = std::sqrt(transform.facingX * transform.facingX +
@@ -61,7 +67,13 @@ public:
                     dash.dashTimer = dash.dashDuration;
                     dash.iframeTimer = dash.iframeDuration;
                     dash.isInvincible = true;
-                    dash.cooldownTimer = dash.cooldown;
+
+                    // 消耗 1 次充能
+                    dash.currentCharges--;
+                    // 如果充能未满，开始充能计时
+                    if (dash.currentCharges < dash.maxCharges) {
+                        dash.rechargeTimer = dash.rechargeCooldown;
+                    }
 
                     if (world.inputs.has(entity)) {
                         world.inputs.get(entity).pendingIntent = ActionIntent::None;
@@ -69,7 +81,8 @@ public:
                     }
 
                     std::cout << "[DashSystem] DASH! speed=" << dash.dashSpeed
-                              << " dir=(" << dash.dashDir.x << ", " << dash.dashDir.y << ")\n";
+                              << " dir=(" << dash.dashDir.x << ", " << dash.dashDir.y
+                              << ") charges=" << dash.currentCharges << "/" << dash.maxCharges << "\n";
                 }
             }
 
@@ -104,16 +117,22 @@ public:
                                    std::abs(transform.velocity.y) < 50.0f);
 
                 if (dash.dashTimer <= 0.0f || speedTooLow) {
-                    // 进入后摇阶段
-                    state.currentState = CharacterState::Recovery;
-                    state.previousState = CharacterState::Recovery;
-                    dash.recoveryTimer = dash.recoveryDuration;
+                    // 无后摇时直接回到 Idle，否则进入 Recovery
+                    if (dash.recoveryDuration <= 0.0f) {
+                        state.currentState = CharacterState::Idle;
+                        state.previousState = CharacterState::Idle;
+                        std::cout << "[DashSystem] Dash finished, back to Idle (no recovery)\n";
+                    } else {
+                        state.currentState = CharacterState::Recovery;
+                        state.previousState = CharacterState::Recovery;
+                        dash.recoveryTimer = dash.recoveryDuration;
 
-                    // 后摇开始时速度清零
+                        std::cout << "[DashSystem] Dash finished, entering Recovery ("
+                                  << dash.recoveryDuration << "s)\n";
+                    }
+
+                    // Dash 结束时速度清零
                     transform.velocity = {0.0f, 0.0f};
-
-                    std::cout << "[DashSystem] Dash finished, entering Recovery ("
-                              << dash.recoveryDuration << "s)\n";
                 }
             }
 
@@ -130,10 +149,23 @@ public:
                 }
             }
 
-            // ========== 非 Dash 状态下冷却计时 ==========
-            if (state.currentState != CharacterState::Dash) {
-                if (dash.cooldownTimer > 0.0f) {
-                    dash.cooldownTimer -= dt;
+            // ========== 充能恢复 ==========
+            // 非 Dash 状态下，如果充能未满则进行充能
+            if (state.currentState != CharacterState::Dash &&
+                dash.currentCharges < dash.maxCharges) {
+                dash.rechargeTimer -= dt;
+
+                if (dash.rechargeTimer <= 0.0f) {
+                    dash.currentCharges++;
+                    std::cout << "[DashSystem] Charge recovered! charges="
+                              << dash.currentCharges << "/" << dash.maxCharges << "\n";
+
+                    // 如果还没满，重置计时器继续充能
+                    if (dash.currentCharges < dash.maxCharges) {
+                        dash.rechargeTimer = dash.rechargeCooldown;
+                    } else {
+                        dash.rechargeTimer = 0.0f;
+                    }
                 }
             }
         }
