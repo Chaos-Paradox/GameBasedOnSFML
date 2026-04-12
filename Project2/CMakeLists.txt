@@ -56,8 +56,8 @@ if(ENABLE_SFML)
     add_subdirectory(tests/sandbox)
 endif()
 
-# 测试
-add_subdirectory(test)
-
-# 单元测试
-add_subdirectory(tests/unit)
+# 测试（需要 GTest）
+if(ENABLE_TESTS)
+    add_subdirectory(test)
+    add_subdirectory(tests/unit)
+endif()

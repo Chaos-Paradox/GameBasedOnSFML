@@ -43,4 +43,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
-add_subdirectory(test)
+# 测试子目录（可选）
+if(ENABLE_TESTS)
+    add_subdirectory(test)
+endif()
