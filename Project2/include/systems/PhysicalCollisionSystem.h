@@ -58,6 +58,17 @@ public:
                     bool bIsDashing = world.states.has(entityB) &&
                                       world.states.get(entityB).currentState == CharacterState::Dash;
                     if (aIsDashing || bIsDashing) continue;
+
+                    // 炸弹刚被踢飞（collisionCooldown > 0）也跳过，避免 dash 过程中被物理推开
+                    Entity bombEntity = aIsBomb ? entityA : entityB;
+                    if (world.momentums.has(bombEntity) &&
+                        world.momentums.get(bombEntity).collisionCooldown > 0.0f) continue;
+
+                    // 炸弹速度 > 100px/s 表示正在飞行中，也跳过物理碰撞
+                    auto& bombTrans = aIsBomb ? transformA : transformB;
+                    float bombSpeed = std::sqrt(bombTrans.velocity.x * bombTrans.velocity.x +
+                                                bombTrans.velocity.y * bombTrans.velocity.y);
+                    if (bombSpeed > 100.0f) continue;
                 }
 
                 float dx = transformB.position.x - transformA.position.x;

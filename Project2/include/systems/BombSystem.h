@@ -130,34 +130,84 @@ public:
 
                 if (bombHasMomentum && world.momentums.get(bomb).collisionCooldown > 0.0f) continue;
 
-                // --- CCD 连续碰撞检测：玩家冲刺轨迹 vs 炸弹位置 ---
-                // 由于 BombSystem 在 MovementSystem 之前运行，玩家 position 还未被更新。
-                // 对于新创建的炸弹（velocity=0），bomb 的 lastPos→currentPos 是零长度线段，
-                // 导致回退到点检测，使用玩家当前位置（冲刺前），无法检测到远距离冲刺。
-                // 解决：用玩家的冲刺轨迹（prevPos → currentPos）与炸弹位置做最近点检测。
-                float prevPlayerX = playerTrans.position.x - playerTrans.velocity.x * dt;
-                float prevPlayerY = playerTrans.position.y - playerTrans.velocity.y * dt;
-                float trajX = playerTrans.position.x - prevPlayerX;
-                float trajY = playerTrans.position.y - prevPlayerY;
-                float trajLenSq = trajX * trajX + trajY * trajY;
+                // --- 直接距离检测（CCD 补充） ---
+                // 玩家贴着炸弹时（< 60px，与 CCD 阈值一致），直接触发踢飞
+                // 这解决了 prevPlayerX 用 velocity*dt 估算不准确的问题：
+                // 当玩家与炸弹重叠或极近时，CCD 线段检测可能错过炸弹
+                float proximityDx = playerTrans.position.x - transform.position.x;
+                float proximityDy = playerTrans.position.y - transform.position.y;
+                float proximityDistance = std::sqrt(proximityDx * proximityDx + proximityDy * proximityDy);
 
-                float distX, distY;
-                if (trajLenSq < 0.001f) {
-                    // 玩家几乎没有移动，直接检查距离
-                    distX = playerTrans.position.x - transform.position.x;
-                    distY = playerTrans.position.y - transform.position.y;
-                } else {
-                    float t = ((transform.position.x - prevPlayerX) * trajX +
-                               (transform.position.y - prevPlayerY) * trajY) / trajLenSq;
-                    t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
-                    float closestX = prevPlayerX + t * trajX;
-                    float closestY = prevPlayerY + t * trajY;
-                    distX = transform.position.x - closestX;
-                    distY = transform.position.y - closestY;
+                bool shouldKick = false;
+                float kickNx = 0.0f, kickNy = 0.0f; // 预计算的碰撞法线
+                float distX = 0.0f, distY = 0.0f;   // 碰撞法线向量（两种路径都会设置）
+
+                if (proximityDistance < 60.0f) {
+                    // 贴着！直接踢飞，不依赖 CCD
+                    shouldKick = true;
+                    distX = proximityDx;
+                    distY = proximityDy;
+
+                    // 计算踢飞方向
+                    if (proximityDistance < 0.001f) {
+                        // 完全重叠，用玩家 facing 方向
+                        kickNx = playerTrans.facingX;
+                        kickNy = playerTrans.facingY;
+                        float fLen = std::sqrt(kickNx * kickNx + kickNy * kickNy);
+                        if (fLen > 0.0f) { kickNx /= fLen; kickNy /= fLen; }
+                        else { kickNx = 1.0f; kickNy = 0.0f; }
+                    } else {
+                        // 从炸弹指向玩家（排斥方向）
+                        kickNx = proximityDx / proximityDistance;
+                        kickNy = proximityDy / proximityDistance;
+                    }
+
+                    std::cout << "[Bomb] 直接距离检测触发踢飞！dist=" << proximityDistance << "\n";
                 }
 
-                float distance = std::sqrt(distX * distX + distY * distY);
-                if (distance >= 60.0f) continue;
+                // --- CCD 连续碰撞检测（用于远距离踢飞） ---
+                if (!shouldKick) {
+                    // 由于 BombSystem 在 MovementSystem 之前运行，玩家 position 还未被更新。
+                    // 对于新创建的炸弹（velocity=0），bomb 的 lastPos→currentPos 是零长度线段，
+                    // 导致回退到点检测，使用玩家当前位置（冲刺前），无法检测到远距离冲刺。
+                    // 解决：用玩家的冲刺轨迹（prevPos → currentPos）与炸弹位置做最近点检测。
+                    float prevPlayerX = playerTrans.position.x - playerTrans.velocity.x * dt;
+                    float prevPlayerY = playerTrans.position.y - playerTrans.velocity.y * dt;
+                    float trajX = playerTrans.position.x - prevPlayerX;
+                    float trajY = playerTrans.position.y - prevPlayerY;
+                    float trajLenSq = trajX * trajX + trajY * trajY;
+
+                    if (trajLenSq < 0.001f) {
+                        // 玩家几乎没有移动，直接检查距离
+                        distX = playerTrans.position.x - transform.position.x;
+                        distY = playerTrans.position.y - transform.position.y;
+                    } else {
+                        float t = ((transform.position.x - prevPlayerX) * trajX +
+                                   (transform.position.y - prevPlayerY) * trajY) / trajLenSq;
+                        t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+                        float closestX = prevPlayerX + t * trajX;
+                        float closestY = prevPlayerY + t * trajY;
+                        distX = transform.position.x - closestX;
+                        distY = transform.position.y - closestY;
+                    }
+
+                    float distance = std::sqrt(distX * distX + distY * distY);
+                    if (distance >= 60.0f) continue;
+
+                    shouldKick = true;
+                    // CCD 法线：从碰撞点指向炸弹中心
+                    float nLen = std::sqrt(distX * distX + distY * distY);
+                    if (nLen < 0.001f) {
+                        kickNx = playerTrans.facingX;
+                        kickNy = playerTrans.facingY;
+                        float fLen = std::sqrt(kickNx * kickNx + kickNy * kickNy);
+                        if (fLen > 0.0f) { kickNx /= fLen; kickNy /= fLen; }
+                        else { kickNx = 1.0f; kickNy = 0.0f; }
+                    } else {
+                        kickNx = distX / nLen;
+                        kickNy = distY / nLen;
+                    }
+                }
 
                 float playerBottom = playerZTrans.z;
                 float playerTop = playerZTrans.z + playerZTrans.height;
