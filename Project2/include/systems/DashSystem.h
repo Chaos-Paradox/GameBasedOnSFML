@@ -61,8 +61,11 @@ public:
                     state.currentState = CharacterState::Dash;
                     state.previousState = CharacterState::Dash;
 
-                    // 启动时设置最高速度
-                    transform.velocity = dash.dashDir * dash.dashSpeed;
+                    // 启动时设置最高速度（受 MAX_SPEED 限制）
+                    constexpr float MAX_SPEED = 1800.0f;
+                    float effectiveSpeed = dash.dashSpeed;
+                    if (effectiveSpeed > MAX_SPEED) effectiveSpeed = MAX_SPEED;
+                    transform.velocity = dash.dashDir * effectiveSpeed;
 
                     dash.dashTimer = dash.dashDuration;
                     dash.iframeTimer = dash.iframeDuration;
@@ -100,8 +103,11 @@ public:
 
                 // 速度曲线：无敌帧期间保持最高速度，无敌帧结束后指数衰减
                 if (dash.iframeTimer > 0.0f) {
-                    // 保持最高速度不变
-                    transform.velocity = dash.dashDir * dash.dashSpeed;
+                    // 保持最高速度不变（受 MAX_SPEED 限制）
+                    constexpr float MAX_SPEED = 1800.0f;
+                    float effectiveSpeed = dash.dashSpeed;
+                    if (effectiveSpeed > MAX_SPEED) effectiveSpeed = MAX_SPEED;
+                    transform.velocity = dash.dashDir * effectiveSpeed;
                 } else {
                     // 指数摩擦衰减
                     float friction = std::pow(0.1f, dt);

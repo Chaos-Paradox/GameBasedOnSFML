@@ -202,6 +202,13 @@ private:
 
                 auto& transformB = world.transforms.get(entityB);
 
+                // Z 轴过滤：CCD 同样需要检查 Z 轴相交
+                float zA = world.zTransforms.has(entityA) ? world.zTransforms.get(entityA).z : 0.0f;
+                float hA = world.zTransforms.has(entityA) ? world.zTransforms.get(entityA).height : 40.0f;
+                float zB = world.zTransforms.has(entityB) ? world.zTransforms.get(entityB).z : 0.0f;
+                float hB = world.zTransforms.has(entityB) ? world.zTransforms.get(entityB).height : 40.0f;
+                if (zA > zB + hB || zA + hA < zB) continue;  // Z 轴不相交，跳过
+
                 // 计算线段上离 colliderB 中心最近的点
                 float tx = transformB.position.x - momA.prevPosX;
                 float ty = transformB.position.y - momA.prevPosY;

@@ -49,6 +49,15 @@ public:
                 }
             }
 
+            // 速度上限：防止高速实体隧穿
+            constexpr float MAX_SPEED = 1800.0f;
+            float speed = std::sqrt(transform.velocity.x * transform.velocity.x + transform.velocity.y * transform.velocity.y);
+            if (speed > MAX_SPEED) {
+                float invSpeed = 1.0f / speed;
+                transform.velocity.x *= MAX_SPEED * invSpeed;
+                transform.velocity.y *= MAX_SPEED * invSpeed;
+            }
+
             transform.position.x += transform.velocity.x * dt;
             transform.position.y += transform.velocity.y * dt;
         }

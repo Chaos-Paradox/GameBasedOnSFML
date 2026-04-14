@@ -442,7 +442,9 @@ int main() {
     // 创建围栏
     createFence(world);
 
-    const sf::Time TIME_PER_FRAME = sf::seconds(1.0f / 60.0f);
+    // ✅ 120fps 固定时间步长物理循环
+    constexpr float PHYSICS_FPS = 120.0f;
+    const sf::Time TIME_PER_FRAME = sf::seconds(1.0f / PHYSICS_FPS);
     sf::Time timeSinceLastUpdate = sf::Time::Zero;
     sf::Clock clock, debugClock;
 
@@ -800,6 +802,12 @@ int main() {
 
         float gameDt = realDt * world.juice.timeScale;
         timeSinceLastUpdate += sf::seconds(gameDt);
+
+        // 防止累积器过大（螺旋死亡）：最多缓冲 0.25s 的物理帧
+        constexpr float MAX_ACCUMULATOR = 0.25f;
+        if (timeSinceLastUpdate.asSeconds() > MAX_ACCUMULATOR) {
+            timeSinceLastUpdate = sf::seconds(MAX_ACCUMULATOR);
+        }
 
         // ================================================================
         // ✅ 双轨制混合输入流
