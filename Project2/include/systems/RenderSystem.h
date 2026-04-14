@@ -28,6 +28,13 @@ private:
     sf::Color COLOR_DEAD_VAL;
     sf::Color COLOR_LOOT_VAL;
 
+    // 成员变量：DamageTextRenderSystem 实例（避免每帧栈上构造）
+    DamageTextRenderSystem m_damageTextSystem;
+
+    // 性能优化：缓存网格（避免每帧创建 40+ sf::VertexArray）
+    sf::VertexArray cachedGridLines;
+    bool gridInitialized = false;
+
 public:
     RenderSystem(float entitySize = 40.0f,
                 sf::Color colorBackground = sf::Color(50, 50, 70),
@@ -69,16 +76,14 @@ public:
         // ========== Camera Shake ==========
         // 获取当前 view（可能是动态相机设置的），而不是用 defaultView 覆盖它
         sf::View view = window.getView();
+        sf::Vector2f originalCenter = view.getCenter();
         auto& juice = world.juice;
 
         if (juice.shakeTimer > 0.0f) {
-            float realDt = 1.0f / 60.0f;
-            juice.shakeTimer -= realDt;
-
-            float offsetX = ((std::rand() % 200) / 100.0f - 1.0f) * juice.shakeIntensity;
-            float offsetY = ((std::rand() % 200) / 100.0f - 1.0f) * juice.shakeIntensity;
-
-            view.move(sf::Vector2f{offsetX, offsetY});
+            juice.shakeTimer -= dt;
+            float offsetX = ((std::rand() % 201) / 100.0f - 1.0f) * juice.shakeIntensity;
+            float offsetY = ((std::rand() % 201) / 100.0f - 1.0f) * juice.shakeIntensity;
+            view.setCenter(sf::Vector2f(originalCenter.x + offsetX, originalCenter.y + offsetY));
             juice.shakeIntensity *= 0.9f;
         }
 
@@ -98,9 +103,14 @@ public:
             }
         }
 
-        // ========== Y-Sorting ==========
+        // ========== Y-Sorting (考虑 z 轴，空中的实体往后排) ==========
         std::sort(renderQueue.begin(), renderQueue.end(), [&world](Entity a, Entity b) {
-            return world.transforms.get(a).position.y < world.transforms.get(b).position.y;
+            float ay = world.transforms.get(a).position.y;
+            float by = world.transforms.get(b).position.y;
+            float az = world.zTransforms.has(a) ? world.zTransforms.get(a).z : 0.0f;
+            float bz = world.zTransforms.has(b) ? world.zTransforms.get(b).z : 0.0f;
+            // 空中的实体往后排（视觉上更远）
+            return (ay - az * 0.5f) < (by - bz * 0.5f);
         });
 
         // ========== 阴影层 ==========
@@ -156,13 +166,12 @@ public:
         // ========== 调试可视化 ==========
         renderHitboxes(window, world.transforms, world.hitboxes, world.zTransforms);
         renderAttackSectors(window, world.states, world.transforms, world.attackStates, world.zTransforms);
-        renderLoot(window, world.transforms, world.itemDatas, colorLOOT);
+        renderLoot(window, world.transforms, world.itemDatas, world.zTransforms, colorLOOT);
         renderBombs(window, world.transforms, world.bombs, world.zTransforms);
 
         // ========== UI层 ==========
         window.setView(window.getDefaultView());
-        DamageTextRenderSystem dtrs;
-        dtrs.update(world, window, font, 1.0f / 60.0f);
+        m_damageTextSystem.update(world, window, font, dt);
 
 
         // ← 不再调用 window.display()，由主循环统一管理
@@ -292,13 +301,19 @@ private:
     }
 
     void renderLoot(sf::RenderWindow& window, const ComponentStore<TransformComponent>& transforms,
-                   const ComponentStore<ItemDataComponent>& itemDatas, sf::Color colorLOOT) {
+                   const ComponentStore<ItemDataComponent>& itemDatas,
+                   const ComponentStore<ZTransformComponent>& zTransforms,
+                   sf::Color colorLOOT) {
         for (Entity loot : itemDatas.entityList()) {
             if (!transforms.has(loot)) continue;
             const auto& transform = transforms.get(loot);
+
+            float z = zTransforms.has(loot) ? zTransforms.get(loot).z : 0.0f;
+            float centerY = transform.position.y - z;
+
             sf::CircleShape lootCircle(8.0f);
             lootCircle.setOrigin({8.0f, 8.0f});
-            lootCircle.setPosition({transform.position.x, transform.position.y});
+            lootCircle.setPosition({transform.position.x, centerY});
             lootCircle.setFillColor(colorLOOT);
             lootCircle.setOutlineColor(sf::Color(0, 150, 0));
             lootCircle.setOutlineThickness(2.0f);
@@ -404,29 +419,37 @@ private:
 
     void renderGrid(sf::RenderWindow& window) {
         const int gridSize = 100;
-        // 网格覆盖 2000x1200 地图
         const int gridMinX = 0;
         const int gridMinY = 0;
         const int gridMaxX = 2000;
         const int gridMaxY = 1200;
 
-        for (int x = gridMinX; x <= gridMaxX; x += gridSize) {
-            sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-            line[0].position = sf::Vector2f(x, gridMinY);
-            line[0].color = sf::Color(100, 100, 120, 100);
-            line[1].position = sf::Vector2f(x, gridMaxY);
-            line[1].color = sf::Color(100, 100, 120, 100);
-            window.draw(line);
+        // 懒初始化：第一次渲染时创建缓存
+        if (!gridInitialized) {
+            int lineCount = (gridMaxX - gridMinX) / gridSize + 1;
+            int rowCount = (gridMaxY - gridMinY) / gridSize + 1;
+            int totalVertices = (lineCount + rowCount) * 2;
+            cachedGridLines = sf::VertexArray(sf::PrimitiveType::Lines, totalVertices);
+
+            int idx = 0;
+            for (int x = gridMinX; x <= gridMaxX; x += gridSize) {
+                cachedGridLines[idx].position = sf::Vector2f(x, gridMinY);
+                cachedGridLines[idx].color = sf::Color(100, 100, 120, 100);
+                cachedGridLines[idx + 1].position = sf::Vector2f(x, gridMaxY);
+                cachedGridLines[idx + 1].color = sf::Color(100, 100, 120, 100);
+                idx += 2;
+            }
+            for (int y = gridMinY; y <= gridMaxY; y += gridSize) {
+                cachedGridLines[idx].position = sf::Vector2f(gridMinX, y);
+                cachedGridLines[idx].color = sf::Color(100, 100, 120, 100);
+                cachedGridLines[idx + 1].position = sf::Vector2f(gridMaxX, y);
+                cachedGridLines[idx + 1].color = sf::Color(100, 100, 120, 100);
+                idx += 2;
+            }
+            gridInitialized = true;
         }
 
-        for (int y = gridMinY; y <= gridMaxY; y += gridSize) {
-            sf::VertexArray line(sf::PrimitiveType::Lines, 2);
-            line[0].position = sf::Vector2f(gridMinX, y);
-            line[0].color = sf::Color(100, 100, 120, 100);
-            line[1].position = sf::Vector2f(gridMaxX, y);
-            line[1].color = sf::Color(100, 100, 120, 100);
-            window.draw(line);
-        }
+        window.draw(cachedGridLines);
     }
 
 };
