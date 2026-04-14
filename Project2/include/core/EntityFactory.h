@@ -323,10 +323,15 @@ public:
 
         // --- ZTransform ---
         const auto& zt = prefab["zTransform"];
-        float initZ = zt.value("initialZ", 20.0f);
+        float baseZ = zt.value("initialZ", 20.0f);
         float initVZ = zt.value("initialVZ", 300.0f);
         float zGravity = zt.value("gravity", -1500.0f);
         float zHeight = zt.value("height", 30.0f);
+        
+        // 炸弹 Z 轴位置基于玩家当前高度
+        float ownerZ = world.zTransforms.has(owner) ? world.zTransforms.get(owner).z : 0.0f;
+        float initZ = ownerZ + baseZ;  // 玩家高度 + 基础偏移
+        
         world.zTransforms.add(bomb, {
             .z = initZ, .vz = initVZ, .gravity = zGravity, .height = zHeight
         });
