@@ -148,10 +148,16 @@ public:
                     distX = proximityDx;
                     distY = proximityDy;
 
-                    // 贴脸踢飞：直接用玩家 facing 方向（冲刺方向）
-                    // 这样炸弹会被踢向玩家冲刺的方向，而不是反向
-                    kickNx = playerTrans.facingX;
-                    kickNy = playerTrans.facingY;
+                    // 贴脸踢飞：用 dashDir（实际冲刺方向）而非 facing
+                    // facing 可能和 dash 方向不一致（如面向右但向左冲刺）
+                    if (world.dashes.has(player)) {
+                        const auto& dashComp = world.dashes.get(player);
+                        kickNx = dashComp.dashDir.x;
+                        kickNy = dashComp.dashDir.y;
+                    } else {
+                        kickNx = playerTrans.facingX;
+                        kickNy = playerTrans.facingY;
+                    }
                     float fLen = std::sqrt(kickNx * kickNx + kickNy * kickNy);
                     if (fLen > 0.0f) { kickNx /= fLen; kickNy /= fLen; }
                     else { kickNx = 1.0f; kickNy = 0.0f; }
@@ -190,10 +196,15 @@ public:
                     if (distance >= 60.0f) continue;
 
                     shouldKick = true;
-                    // CCD 检测：用玩家 facing 方向作为踢飞方向
-                    // 炸弹被踢向玩家冲刺的方向
-                    kickNx = playerTrans.facingX;
-                    kickNy = playerTrans.facingY;
+                    // CCD 检测：用 dashDir（实际冲刺方向）而非 facing
+                    if (world.dashes.has(player)) {
+                        const auto& dashComp = world.dashes.get(player);
+                        kickNx = dashComp.dashDir.x;
+                        kickNy = dashComp.dashDir.y;
+                    } else {
+                        kickNx = playerTrans.facingX;
+                        kickNy = playerTrans.facingY;
+                    }
                     float fLen = std::sqrt(kickNx * kickNx + kickNy * kickNy);
                     if (fLen > 0.0f) { kickNx /= fLen; kickNy /= fLen; }
                     else { kickNx = 1.0f; kickNy = 0.0f; }

@@ -343,7 +343,7 @@ public:
         float momMass = mom.value("mass", 10.0f);
         bool useCCD = mom.value("useCCD", false);
         world.momentums.add(bomb, {
-            .mass = momMass, .velocity = {0.0f, 0.0f}, .collisionCooldown = 0.0f,
+            .mass = momMass, .velocity = {0.0f, 0.0f}, .collisionCooldown = 0.08f,  // 防止首帧被踢飞
             .prevPosX = spawnX, .prevPosY = spawnY, .useCCD = useCCD
         });
 
