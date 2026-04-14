@@ -148,21 +148,16 @@ public:
                     distX = proximityDx;
                     distY = proximityDy;
 
-                    // 计算踢飞方向
-                    if (proximityDistance < 0.001f) {
-                        // 完全重叠，用玩家 facing 方向
-                        kickNx = playerTrans.facingX;
-                        kickNy = playerTrans.facingY;
-                        float fLen = std::sqrt(kickNx * kickNx + kickNy * kickNy);
-                        if (fLen > 0.0f) { kickNx /= fLen; kickNy /= fLen; }
-                        else { kickNx = 1.0f; kickNy = 0.0f; }
-                    } else {
-                        // 从炸弹指向玩家（排斥方向）
-                        kickNx = proximityDx / proximityDistance;
-                        kickNy = proximityDy / proximityDistance;
-                    }
+                    // 贴脸踢飞：直接用玩家 facing 方向（冲刺方向）
+                    // 这样炸弹会被踢向玩家冲刺的方向，而不是反向
+                    kickNx = playerTrans.facingX;
+                    kickNy = playerTrans.facingY;
+                    float fLen = std::sqrt(kickNx * kickNx + kickNy * kickNy);
+                    if (fLen > 0.0f) { kickNx /= fLen; kickNy /= fLen; }
+                    else { kickNx = 1.0f; kickNy = 0.0f; }
 
-                    std::cout << "[Bomb] 直接距离检测触发踢飞！dist=" << proximityDistance << "\n";
+                    std::cout << "[Bomb] 直接距离检测触发踢飞！dist=" << proximityDistance
+                              << " kickDir=(" << kickNx << "," << kickNy << ")\n";
                 }
 
                 // --- CCD 连续碰撞检测（用于远距离踢飞） ---
@@ -195,18 +190,13 @@ public:
                     if (distance >= 60.0f) continue;
 
                     shouldKick = true;
-                    // CCD 法线：从碰撞点指向炸弹中心
-                    float nLen = std::sqrt(distX * distX + distY * distY);
-                    if (nLen < 0.001f) {
-                        kickNx = playerTrans.facingX;
-                        kickNy = playerTrans.facingY;
-                        float fLen = std::sqrt(kickNx * kickNx + kickNy * kickNy);
-                        if (fLen > 0.0f) { kickNx /= fLen; kickNy /= fLen; }
-                        else { kickNx = 1.0f; kickNy = 0.0f; }
-                    } else {
-                        kickNx = distX / nLen;
-                        kickNy = distY / nLen;
-                    }
+                    // CCD 检测：用玩家 facing 方向作为踢飞方向
+                    // 炸弹被踢向玩家冲刺的方向
+                    kickNx = playerTrans.facingX;
+                    kickNy = playerTrans.facingY;
+                    float fLen = std::sqrt(kickNx * kickNx + kickNy * kickNy);
+                    if (fLen > 0.0f) { kickNx /= fLen; kickNy /= fLen; }
+                    else { kickNx = 1.0f; kickNy = 0.0f; }
                 }
 
                 float playerBottom = playerZTrans.z;
