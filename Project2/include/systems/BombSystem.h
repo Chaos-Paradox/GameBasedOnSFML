@@ -207,20 +207,10 @@ public:
                 bool zIntersect = !(playerBottom > bombTop || playerTop < bombBottom);
                 if (!zIntersect) continue;
 
-                // --- 碰撞法线：从碰撞点指向玩家中心 ---
-                float nx = distX;
-                float ny = distY;
-                float nLen = std::sqrt(nx * nx + ny * ny);
-                if (nLen < 0.001f) {
-                    nx = playerTrans.facingX;
-                    ny = playerTrans.facingY;
-                    nLen = std::sqrt(nx * nx + ny * ny);
-                    if (nLen > 0.0f) { nx /= nLen; ny /= nLen; }
-                    else { nx = 1.0f; ny = 0.0f; }
-                } else {
-                    nx /= nLen;
-                    ny /= nLen;
-                }
+                // --- 碰撞法线：直接用之前计算的 kickNx/kickNy ---
+                // 炸弹被踢向玩家冲刺方向（facing），不受穿模影响
+                float nx = kickNx;
+                float ny = kickNy;
 
                 // --- 获取质量（从 MomentumComponent 读取，单一数据源） ---
                 float playerMass = 100.0f;
