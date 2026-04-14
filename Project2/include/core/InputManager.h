@@ -77,18 +77,28 @@ enum class EngineKey {
 /**
  * @brief 输入管理器 - 双玩家独立绑定 + JSON 持久化
  *
+ * 三级优先级加载：user_keybinds.json > data/default_keybinds.json > 硬编码 fallback
  * 每个玩家拥有独立的 GameAction → EngineKey 绑定表。
- * 配置自动保存到 settings.json，跨会话保留。
  */
 class InputManager {
 public:
     // 双玩家独立绑定表
     std::unordered_map<PlayerIndex, std::unordered_map<GameAction, EngineKey>> bindings;
-    std::string configPath = "settings.json";
+    std::string userConfigPath = "data/user_keybinds.json";
+    std::string defaultConfigPath = "data/default_keybinds.json";
 
     InputManager() {
-        initDefaults();
-        loadConfig(); // 加载用户配置（覆盖默认值），如果文件不存在则生成默认文件
+        // 三级优先级加载
+        if (loadFromJson(userConfigPath)) {
+            std::cout << "[InputManager] User config loaded from " << userConfigPath << std::endl;
+        } else if (loadFromJson(defaultConfigPath)) {
+            std::cout << "[InputManager] Default config loaded from " << defaultConfigPath << std::endl;
+            saveConfig();  // 首次运行：复制一份默认配置到 user_keybinds.json
+        } else {
+            initDefaults();
+            std::cout << "[InputManager] Using hardcoded defaults (no JSON found)" << std::endl;
+            saveConfig();  // 生成 user_keybinds.json
+        }
     }
 
     /**
@@ -124,6 +134,37 @@ public:
         p2[GameAction::Pause]      = EngineKey::Num7;
         p2[GameAction::FrameStep]  = EngineKey::Num9;
         p2[GameAction::SpawnDummy] = EngineKey::MouseRight;
+    }
+
+    /**
+     * @brief 从指定 JSON 文件加载键位配置
+     * @param path JSON 文件路径
+     * @return 成功返回 true，失败返回 false
+     */
+    bool loadFromJson(const std::string& path) {
+        std::ifstream file(path);
+        if (!file.is_open()) return false;
+
+        try {
+            json root;
+            file >> root;
+
+            for (auto& [playerKey, pJson] : root.items()) {
+                PlayerIndex player = (playerKey == "P1") ? PlayerIndex::P1 : PlayerIndex::P2;
+                if (!pJson.is_object()) continue;
+
+                for (auto& [actionStr, keyStr] : pJson.items()) {
+                    GameAction action = stringToAction(actionStr);
+                    EngineKey key = stringToKey(keyStr.get<std::string>());
+                    if (key != EngineKey::Unknown) {
+                        bindings[player][action] = key;
+                    }
+                }
+            }
+            return true;
+        } catch (...) {
+            return false;
+        }
     }
 
     // ===== 获取绑定 =====
@@ -344,14 +385,20 @@ public:
      * @brief 重置所有绑定为默认值
      */
     void resetToDefaults() {
-        initDefaults();
-        saveConfig();
+        // 从默认模板加载，然后保存到用户配置
+        if (loadFromJson(defaultConfigPath)) {
+            std::cout << "[InputManager] Reset to defaults from " << defaultConfigPath << std::endl;
+        } else {
+            initDefaults();
+            std::cout << "[InputManager] Reset to hardcoded defaults" << std::endl;
+        }
+        saveConfig();  // 写入 user_keybinds.json
     }
 
     // ===== JSON 持久化 =====
 
     /**
-     * @brief 保存 P1/P2 绑定到 settings.json
+     * @brief 保存 P1/P2 绑定到 user_keybinds.json
      *
      * 格式:
      * {
@@ -370,50 +417,13 @@ public:
             root[playerKey] = pJson;
         }
 
-        std::ofstream file(configPath);
+        std::ofstream file(userConfigPath);
         if (file.is_open()) {
             file << root.dump(4);
             file.close();
-            std::cout << "[InputManager] Config saved to " << configPath << std::endl;
+            std::cout << "[InputManager] Config saved to " << userConfigPath << std::endl;
         } else {
-            std::cerr << "[InputManager] Failed to save config to " << configPath << std::endl;
-        }
-    }
-
-    /**
-     * @brief 从 settings.json 加载 P1/P2 绑定
-     *
-     * 如果文件不存在或解析失败，保留默认值并自动生成 settings.json。
-     */
-    void loadConfig() {
-        std::ifstream file(configPath);
-        if (!file.is_open()) {
-            std::cout << "[InputManager] No config file found, using defaults & generating " << configPath << std::endl;
-            saveConfig(); // 首次运行生成默认文件
-            return;
-        }
-
-        try {
-            json root;
-            file >> root;
-
-            for (auto& [playerKey, pJson] : root.items()) {
-                PlayerIndex player = (playerKey == "P1") ? PlayerIndex::P1 : PlayerIndex::P2;
-                if (!pJson.is_object()) continue;
-
-                for (auto& [actionStr, keyStr] : pJson.items()) {
-                    GameAction action = stringToAction(actionStr);
-                    EngineKey key = stringToKey(keyStr.get<std::string>());
-                    if (key != EngineKey::Unknown) {
-                        bindings[player][action] = key;
-                    }
-                }
-            }
-
-            std::cout << "[InputManager] Config loaded from " << configPath << std::endl;
-        } catch (const std::exception& e) {
-            std::cerr << "[InputManager] Failed to parse config: " << e.what() << std::endl;
-            // 解析失败时保留默认值
+            std::cerr << "[InputManager] Failed to save config to " << userConfigPath << std::endl;
         }
     }
 };

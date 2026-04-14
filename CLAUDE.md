@@ -25,7 +25,7 @@ cmake --build build
 
 ```bash
 # From project root (material/ path is relative to CWD)
-./Project2/build/bin/VisualSandbox
+./Project2/build/VisualSandbox
 ```
 
 ### Full top-level build (builds both Project1 + Project2)

@@ -403,9 +403,8 @@ int main() {
     float timeScale = 1.0f;
     bool frameStep = false;
 
-    // ✅ 单一世界上下文
+    // ✅ 单一世界上下文（InputManager 构造函数已自动加载配置）
     GameWorld world;
-    world.inputManager.loadConfig();
 
     // 实例化所有系统
     StateMachineSystem stateSystem;

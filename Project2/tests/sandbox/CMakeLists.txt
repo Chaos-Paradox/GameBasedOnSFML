@@ -42,5 +42,13 @@ endif()
 
 # 设置输出目录
 set_target_properties(VisualSandbox PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
+# 复制 data 目录到构建输出目录
+add_custom_command(TARGET VisualSandbox POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+        ${CMAKE_SOURCE_DIR}/data
+        ${CMAKE_BINARY_DIR}/data
+    COMMENT "Copying data files to build directory"
 )

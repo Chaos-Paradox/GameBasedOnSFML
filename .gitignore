@@ -56,3 +56,6 @@ Desktop.ini
 # 临时文件
 *.tmp
 *.temp
+
+# 用户键位配置（不提交）
+data/user_keybinds.json
