@@ -169,10 +169,8 @@ public:
         renderLoot(window, world.transforms, world.itemDatas, world.zTransforms, colorLOOT);
         renderBombs(window, world.transforms, world.bombs, world.zTransforms);
 
-        // ========== UI层 ==========
-        window.setView(window.getDefaultView());
+        // ========== 伤害飘字 (世界坐标，跟随镜头) ==========
         m_damageTextSystem.update(world, window, font, dt);
-
 
         // ← 不再调用 window.display()，由主循环统一管理
     }
