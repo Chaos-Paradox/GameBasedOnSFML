@@ -16,7 +16,7 @@
       "layer": 1
     },
     "dash": {
-      "dashSpeed": 2000.0,
+      "dashSpeed":1200.0,
       "dashDuration": 0.1,
       "iframeDuration": 0.1,
       "recoveryDuration": 0.0,

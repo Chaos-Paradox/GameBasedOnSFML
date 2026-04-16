@@ -47,6 +47,39 @@ public:
             bombComp.lastPosX = transform.position.x;
             bombComp.lastPosY = transform.position.y;
 
+            // ========== 脱离母体保护 (Exit Grace Period) ==========
+            // 空间 + 时间双重锁（Spatio-Temporal Lock）：
+            //   1. graceTimer 倒计时：期间绝对免疫母体 Dash 碰撞（不受帧率影响）
+            //   2. 空间脱离判定：graceTimer 到期后，用距离阈值做长期保护
+            if (world.throwables.has(bomb)) {
+                auto& throwComp = world.throwables.get(bomb);
+
+                // 倒计时保护期
+                if (throwComp.graceTimer > 0.0f) {
+                    throwComp.graceTimer -= dt;
+                }
+
+                // 踢飞豁免期倒计时
+                if (throwComp.ignoreKickerTimer > 0.0f) {
+                    throwComp.ignoreKickerTimer -= dt;
+                    if (throwComp.ignoreKickerTimer < 0.0f) throwComp.ignoreKickerTimer = 0.0f;
+                }
+
+                // 保护期结束后，用空间距离做长期判定
+                if (!throwComp.hasExitedOwner && throwComp.graceTimer <= 0.0f
+                    && world.transforms.has(throwComp.owner)) {
+                    auto& ownerTrans = world.transforms.get(throwComp.owner);
+                    float dx = transform.position.x - ownerTrans.position.x;
+                    float dy = transform.position.y - ownerTrans.position.y;
+                    float distSq = dx * dx + dy * dy;
+                    constexpr float EXIT_THRESHOLD = 40.0f;
+                    if (distSq > EXIT_THRESHOLD * EXIT_THRESHOLD) {
+                        throwComp.hasExitedOwner = true;
+                        std::cout << "[Bomb] 💣 炸弹已脱离母体（空间）！dist=" << std::sqrt(distSq) << "\n";
+                    }
+                }
+            }
+
             // 重置踢飞标记（每帧刷新）
             bombComp.isKicked = false;
 
@@ -130,40 +163,44 @@ public:
 
                 if (bombHasMomentum && world.momentums.get(bomb).collisionCooldown > 0.0f) continue;
 
-                // --- 直接距离检测（CCD 补充） ---
-                // 玩家贴着炸弹时（< 60px，与 CCD 阈值一致），直接触发踢飞
-                // 这解决了 prevPlayerX 用 velocity*dt 估算不准确的问题：
-                // 当玩家与炸弹重叠或极近时，CCD 线段检测可能错过炸弹
+                // --- 计算距离（提前，为自碰撞方向判断提供数据） ---
                 float proximityDx = playerTrans.position.x - transform.position.x;
                 float proximityDy = playerTrans.position.y - transform.position.y;
                 float proximityDistance = std::sqrt(proximityDx * proximityDx + proximityDy * proximityDy);
 
+                // --- 自碰撞拦截 (Exit Grace Period, 方向性) ---
+                // 保护期内，只有当玩家远离炸弹（dotProx > 0）时才拦截，
+                // 防止反向踢飞。冲向炸弹时允许踢飞，不做一刀切拦截。
+                if (world.throwables.has(bomb)) {
+                    const auto& throwComp = world.throwables.get(bomb);
+                    bool inGracePeriod = throwComp.graceTimer > 0.0f || !throwComp.hasExitedOwner;
+                    if (player == throwComp.owner && inGracePeriod) {
+                        float dotProx = proximityDx * playerTrans.velocity.x +
+                                        proximityDy * playerTrans.velocity.y;
+                        if (dotProx > 0.0f) {
+                            // 玩家在远离炸弹，拦截（防止反向踢飞）
+                            continue;
+                        }
+                        // 玩家在靠近炸弹，允许踢飞
+                    }
+                }
+
                 bool shouldKick = false;
-                float kickNx = 0.0f, kickNy = 0.0f; // 预计算的碰撞法线
                 float distX = 0.0f, distY = 0.0f;   // 碰撞法线向量（两种路径都会设置）
 
+                // --- 直接距离检测（CCD 补充） ---
                 if (proximityDistance < 60.0f) {
-                    // 贴着！直接踢飞，不依赖 CCD
-                    shouldKick = true;
-                    distX = proximityDx;
-                    distY = proximityDy;
-
-                    // 贴脸踢飞：用 dashDir（实际冲刺方向）而非 facing
-                    // facing 可能和 dash 方向不一致（如面向右但向左冲刺）
-                    if (world.dashes.has(player)) {
-                        const auto& dashComp = world.dashes.get(player);
-                        kickNx = dashComp.dashDir.x;
-                        kickNy = dashComp.dashDir.y;
-                    } else {
-                        kickNx = playerTrans.facingX;
-                        kickNy = playerTrans.facingY;
+                    // 贴着！dotProx < 0 已在上方自碰撞拦截中判定过（owner 情况），
+                    // 非 owner 或已通过的 player 可以直接触发踢飞
+                    float dotProx = proximityDx * playerTrans.velocity.x +
+                                    proximityDy * playerTrans.velocity.y;
+                    if (dotProx < 0.0f) {
+                        // 玩家正靠近炸弹，触发踢飞
+                        shouldKick = true;
+                        distX = proximityDx;
+                        distY = proximityDy;
                     }
-                    float fLen = std::sqrt(kickNx * kickNx + kickNy * kickNy);
-                    if (fLen > 0.0f) { kickNx /= fLen; kickNy /= fLen; }
-                    else { kickNx = 1.0f; kickNy = 0.0f; }
-
-                    std::cout << "[Bomb] 直接距离检测触发踢飞！dist=" << proximityDistance
-                              << " kickDir=(" << kickNx << "," << kickNy << ")\n";
+                    // 否则：玩家在远离炸弹（已穿过），不触发碰撞
                 }
 
                 // --- CCD 连续碰撞检测（用于远距离踢飞） ---
@@ -188,26 +225,15 @@ public:
                         t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
                         float closestX = prevPlayerX + t * trajX;
                         float closestY = prevPlayerY + t * trajY;
-                        distX = transform.position.x - closestX;
-                        distY = transform.position.y - closestY;
+                        // 从炸弹指向最近点（与近距离路径 distX=player-bomb 语义一致）
+                        distX = closestX - transform.position.x;
+                        distY = closestY - transform.position.y;
                     }
 
                     float distance = std::sqrt(distX * distX + distY * distY);
                     if (distance >= 60.0f) continue;
 
                     shouldKick = true;
-                    // CCD 检测：用 dashDir（实际冲刺方向）而非 facing
-                    if (world.dashes.has(player)) {
-                        const auto& dashComp = world.dashes.get(player);
-                        kickNx = dashComp.dashDir.x;
-                        kickNy = dashComp.dashDir.y;
-                    } else {
-                        kickNx = playerTrans.facingX;
-                        kickNy = playerTrans.facingY;
-                    }
-                    float fLen = std::sqrt(kickNx * kickNx + kickNy * kickNy);
-                    if (fLen > 0.0f) { kickNx /= fLen; kickNy /= fLen; }
-                    else { kickNx = 1.0f; kickNy = 0.0f; }
                 }
 
                 float playerBottom = playerZTrans.z;
@@ -218,10 +244,40 @@ public:
                 bool zIntersect = !(playerBottom > bombTop || playerTop < bombBottom);
                 if (!zIntersect) continue;
 
-                // --- 碰撞法线：直接用之前计算的 kickNx/kickNy ---
-                // 炸弹被踢向玩家冲刺方向（facing），不受穿模影响
-                float nx = kickNx;
-                float ny = kickNy;
+                // --- 碰撞法线：用真实几何方向（distX/distY 归一化） ---
+                // 两条路径统一语义：从炸弹指向碰撞点（玩家中心）
+                // 近距离：distX/distY = player - bomb
+                // CCD：distX/distY = -(bomb - closestPoint) = closestPoint - bomb
+                float nLen = std::sqrt(distX * distX + distY * distY);
+                float nx, ny;
+                bool usedFallback = false;
+                if (nLen > 0.001f) {
+                    nx = distX / nLen;
+                    ny = distY / nLen;
+                } else {
+                    usedFallback = true;
+                    // 极近距离 fallback：用 dashDir 或 facing
+                    if (world.dashes.has(player)) {
+                        const auto& dashComp = world.dashes.get(player);
+                        nx = dashComp.dashDir.x;
+                        ny = dashComp.dashDir.y;
+                    } else {
+                        nx = playerTrans.facingX;
+                        ny = playerTrans.facingY;
+                    }
+                    float fLen = std::sqrt(nx * nx + ny * ny);
+                    if (fLen > 0.0f) { nx /= fLen; ny /= fLen; }
+                    else { nx = 1.0f; ny = 0.0f; }
+                }
+                
+                // Debug log
+                std::cout << "[BombKick] playerPos=" << playerTrans.position.x << 
+                          " bombPos=" << transform.position.x <<
+                          " proximityDist=" << proximityDistance <<
+                          " nLen=" << nLen <<
+                          " fallback=" << usedFallback <<
+                          " nx=" << nx <<
+                          " dashDir.x=" << (world.dashes.has(player) ? world.dashes.get(player).dashDir.x : 0) << "\n";
 
                 // --- 获取质量（从 MomentumComponent 读取，单一数据源） ---
                 float playerMass = 100.0f;
@@ -248,6 +304,25 @@ public:
                 }
 
                 bombComp.isKicked = true;
+
+                // 探针：乌龙球检测
+                if (world.throwables.has(bomb)) {
+                    const auto& throwComp = world.throwables.get(bomb);
+                    if (player == throwComp.owner) {
+                        std::cout << "💥 [乌龙球] 自碰撞！graceTimer=" << throwComp.graceTimer
+                                  << " hasExited=" << throwComp.hasExitedOwner
+                                  << " playerVel=(" << playerTrans.velocity.x << ", " << playerTrans.velocity.y << ")\n";
+                    }
+                }
+
+                // ========== 踢飞豁免期 (Collision Immunity) ==========
+                // 炸弹被踢飞后 0.15s 内绝对穿透原踢飞者，防止刚体碰撞把炸弹弹回
+                if (world.throwables.has(bomb)) {
+                    auto& throwComp = world.throwables.get(bomb);
+                    throwComp.lastKickedBy = player;
+                    throwComp.ignoreKickerTimer = 0.15f;
+                    std::cout << "[Bomb] 🔒 刚体豁免期开启，ignoreKickerTimer=0.15s\n";
+                }
 
                 // --- 弹性碰撞（沿法线方向） ---
                 // 1. 将速度分解为法线分量和切线分量
@@ -312,10 +387,10 @@ public:
                     std::cout << "[Bomb] 下落扣杀！vz=50\n";
                 }
 
-                std::cout << "[Bomb] ⚽ 弹性碰撞击飞！p_mass=" << playerMass
-                          << " b_mass=" << bombMass
-                          << " p_vel=(" << v1x_new << ", " << v1y_new << ")"
-                          << " b_vel=(" << v2x_new << ", " << v2y_new << ")\n";
+                std::cout << "[BombKick] RESULT: bombVel=" << v2x_new << 
+                          " playerVel=" << v1x_new <<
+                          " v1n=" << v1n <<
+                          " v2n_new=" << v2n_new << "\n";
 
                 // 每个炸弹每帧只允许被一个玩家踢一次
                 break;

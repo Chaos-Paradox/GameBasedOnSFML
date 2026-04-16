@@ -304,11 +304,12 @@ public:
         float spawnY = ownerTrans.position.y + fy * spawnOffset;
 
         // --- Transform ---
+        // 炸弹继承投掷者的初速度（Dash 时丢出炸弹会跟着飞出去）
         world.transforms.add(bomb, {
             .position = {spawnX, spawnY},
             .scale = {1.0f, 1.0f},
             .rotation = 0.0f,
-            .velocity = {0.0f, 0.0f},
+            .velocity = ownerTrans.velocity,
             .facingX = fx,
             .facingY = fy
         });
@@ -322,18 +323,14 @@ public:
         });
 
         // --- ZTransform ---
+        // 炸弹直接出现在面前地面，不做抛掷动画
+        // 避免空中弹跳阶段 Z 高度不稳定导致碰撞检测异常
         const auto& zt = prefab["zTransform"];
-        float baseZ = zt.value("initialZ", 20.0f);
-        float initVZ = zt.value("initialVZ", 300.0f);
         float zGravity = zt.value("gravity", -1500.0f);
         float zHeight = zt.value("height", 30.0f);
         
-        // 炸弹 Z 轴位置基于玩家当前高度
-        float ownerZ = world.zTransforms.has(owner) ? world.zTransforms.get(owner).z : 0.0f;
-        float initZ = ownerZ + baseZ;  // 玩家高度 + 基础偏移
-        
         world.zTransforms.add(bomb, {
-            .z = initZ, .vz = initVZ, .gravity = zGravity, .height = zHeight
+            .z = 0.0f, .vz = 0.0f, .gravity = zGravity, .height = zHeight
         });
 
         // --- Collider ---
@@ -348,8 +345,15 @@ public:
         float momMass = mom.value("mass", 10.0f);
         bool useCCD = mom.value("useCCD", false);
         world.momentums.add(bomb, {
-            .mass = momMass, .velocity = {0.0f, 0.0f}, .collisionCooldown = 0.08f,  // 防止首帧被踢飞
+            .mass = momMass, .velocity = ownerTrans.velocity, .collisionCooldown = 0.08f,
             .prevPosX = spawnX, .prevPosY = spawnY, .useCCD = useCCD
+        });
+
+        // --- Throwable ---
+        world.throwables.add(bomb, {
+            .owner = owner,
+            .graceTimer = 0.15f,
+            .hasExitedOwner = false
         });
 
         return bomb;

@@ -85,6 +85,18 @@ public:
                 float minDist = colliderA.radius + colliderB.radius;
                 if (dist >= minDist) continue;
 
+                // ========== 踢飞豁免期拦截 (Collision Immunity) ==========
+                // 炸弹被踢飞后，在豁免期内无视原踢飞者的刚体碰撞，直接穿透
+                {
+                    bool skipA = world.throwables.has(entityA) &&
+                                 world.throwables.get(entityA).lastKickedBy == entityB &&
+                                 world.throwables.get(entityA).ignoreKickerTimer > 0.0f;
+                    bool skipB = world.throwables.has(entityB) &&
+                                 world.throwables.get(entityB).lastKickedBy == entityA &&
+                                 world.throwables.get(entityB).ignoreKickerTimer > 0.0f;
+                    if (skipA || skipB) continue;
+                }
+
                 // Z 轴过滤：跳跃中的实体不应与地面实体发生物理排斥
                 float zA = world.zTransforms.has(entityA) ? world.zTransforms.get(entityA).z : 0.0f;
                 float hA = world.zTransforms.has(entityA) ? world.zTransforms.get(entityA).height : 40.0f;
@@ -114,6 +126,17 @@ public:
                 else if (colliderB.isStatic) {
                     transformA.position.x -= dirX * overlap;
                     transformA.position.y -= dirY * overlap;
+
+                    // 逃逸速度：推开后必须有足够速度远离，否则下一帧摩擦衰减又重叠
+                    float friction = std::pow(0.001f, dt);
+                    float escapeSpeed = overlap / dt / friction;
+                    if (world.momentums.has(entityA)) {
+                        auto& momA = world.momentums.get(entityA);
+                        momA.velocity.x -= dirX * escapeSpeed;
+                        momA.velocity.y -= dirY * escapeSpeed;
+                        transformA.velocity = {momA.velocity.x, momA.velocity.y};
+                    }
+
                     std::cout << "[Physics] Static collision: A pushed by " << overlap << "\n";
                 }
                 else {
@@ -126,46 +149,31 @@ public:
                     transformB.position.x += dirX * overlap * ratioB;
                     transformB.position.y += dirY * overlap * ratioB;
 
-                    std::cout << "[Physics] Dynamic collision (mass): A moves " << (overlap * ratioA)
-                              << ", B moves " << (overlap * ratioB) << "\n";
-
-                    // 速度从 MomentumComponent 读取，回退到 TransformComponent
-                    Vec2 velA = world.momentums.has(entityA) ? world.momentums.get(entityA).velocity
-                                                             : transformA.velocity;
-                    Vec2 velB = world.momentums.has(entityB) ? world.momentums.get(entityB).velocity
-                                                             : transformB.velocity;
-
-                    float relVelX = velA.x - velB.x;
-                    float relVelY = velA.y - velB.y;
-                    float velocityAlongNormal = relVelX * dirX + relVelY * dirY;
-
-                    if (velocityAlongNormal > 0) continue;
-
-                    float e = 0.5f;
-                    float j = -(1.0f + e) * velocityAlongNormal;
-                    j /= (1.0f / massA + 1.0f / massB);
-
-                    float impulseX = j * dirX;
-                    float impulseY = j * dirY;
-
-                    float newVxA = velA.x + (impulseX / massA);
-                    float newVyA = velA.y + (impulseY / massA);
-                    float newVxB = velB.x - (impulseX / massB);
-                    float newVyB = velB.y - (impulseY / massB);
-
-                    transformA.velocity.x = newVxA;
-                    transformA.velocity.y = newVyA;
-                    transformB.velocity.x = newVxB;
-                    transformB.velocity.y = newVyB;
-
-                    if (world.momentums.has(entityA)) {
-                        world.momentums.get(entityA).velocity = {newVxA, newVyA};
+                    // ========== 重叠碰撞：只做位置推开 + 逃逸速度 ==========
+                    // 推开后必须给足够速度远离，否则下一帧 MovementSystem 摩擦衰减
+                    // (pow(0.001,dt)≈0.77x) 把推开效果抵消，导致玩家追上再次重叠。
+                    // 逃逸速度 = 位移/dt/摩擦，保证衰减后的有效速度 = 推开位移/dt。
+                    float friction = std::pow(0.001f, dt);
+                    {
+                        float dispA = overlap * ratioA;
+                        float escapeSpeed = dispA / dt / friction;
+                        if (world.momentums.has(entityA)) {
+                            auto& momA = world.momentums.get(entityA);
+                            momA.velocity.x -= dirX * escapeSpeed;
+                            momA.velocity.y -= dirY * escapeSpeed;
+                            transformA.velocity = {momA.velocity.x, momA.velocity.y};
+                        }
                     }
-                    if (world.momentums.has(entityB)) {
-                        world.momentums.get(entityB).velocity = {newVxB, newVyB};
+                    {
+                        float dispB = overlap * ratioB;
+                        float escapeSpeed = dispB / dt / friction;
+                        if (world.momentums.has(entityB)) {
+                            auto& momB = world.momentums.get(entityB);
+                            momB.velocity.x += dirX * escapeSpeed;
+                            momB.velocity.y += dirY * escapeSpeed;
+                            transformB.velocity = {momB.velocity.x, momB.velocity.y};
+                        }
                     }
-
-                    std::cout << "[Physics] 💥 Momentum impulse! j=" << j << "\n";
                 }
             }
         }
@@ -242,6 +250,15 @@ private:
                 minDist += radiusA;
 
                 if (dist < minDist && dist > 0.001f) {
+                    // ========== 踢飞豁免期拦截 (CCD) ==========
+                    bool skipA = world.throwables.has(entityA) &&
+                                 world.throwables.get(entityA).lastKickedBy == entityB &&
+                                 world.throwables.get(entityA).ignoreKickerTimer > 0.0f;
+                    bool skipB = world.throwables.has(entityB) &&
+                                 world.throwables.get(entityB).lastKickedBy == entityA &&
+                                 world.throwables.get(entityB).ignoreKickerTimer > 0.0f;
+                    if (skipA || skipB) continue;
+
                     // 碰撞！推回到碰撞点
                     float pushBackX = closestX + (dx / dist) * (minDist - 0.01f);
                     float pushBackY = closestY + (dy / dist) * (minDist - 0.01f);

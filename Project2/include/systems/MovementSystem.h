@@ -49,10 +49,19 @@ public:
                 }
             }
 
-            // 速度上限：防止高速实体隧穿
+            // 速度上限：防止高速实体隧穿（普通实体遵守，投掷物和动量实体免限速）
             constexpr float MAX_SPEED = 1800.0f;
             float speed = std::sqrt(transform.velocity.x * transform.velocity.x + transform.velocity.y * transform.velocity.y);
-            if (speed > MAX_SPEED) {
+
+            bool isHighSpeedProjectile = false;
+            if (world.throwables.has(entity)) {
+                isHighSpeedProjectile = true;
+            }
+            if (world.momentums.has(entity)) {
+                isHighSpeedProjectile = true;
+            }
+
+            if (!isHighSpeedProjectile && speed > MAX_SPEED) {
                 float invSpeed = 1.0f / speed;
                 transform.velocity.x *= MAX_SPEED * invSpeed;
                 transform.velocity.y *= MAX_SPEED * invSpeed;
