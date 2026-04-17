@@ -844,7 +844,7 @@ int main() {
 
             if (isActionPressed(world.inputManager, PlayerIndex::P1, GameAction::Jump) && world.zTransforms.has(world.player1)) {
                 auto& zc = world.zTransforms.get(world.player1);
-                if (zc.isGrounded()) { zc.vz = 800.0f; }
+                if (zc.z <= 0.0f) { zc.vz = 800.0f; }
             }
 
             p1BombCD = std::max(0.0f, p1BombCD - realDt);
@@ -920,7 +920,7 @@ factory.spawnThrowableBomb(world, world.player1, world.inputs.get(world.player1)
 
             if (isActionPressed(world.inputManager, PlayerIndex::P2, GameAction::Jump) && world.zTransforms.has(world.player2)) {
                 auto& zc = world.zTransforms.get(world.player2);
-                if (zc.isGrounded()) { zc.vz = 800.0f; }
+                if (zc.z <= 0.0f) { zc.vz = 800.0f; }
             }
 
             p2BombCD = std::max(0.0f, p2BombCD - realDt);
@@ -968,9 +968,17 @@ factory.spawnThrowableBomb(world, world.player2, world.inputs.get(world.player2)
             for (Entity entity : world.zTransforms.entityList()) {
                 if (world.zTransforms.has(entity)) {
                     auto& zTrans = world.zTransforms.get(entity);
-                    zTrans.applyGravity(fixedDt);
+                    // 内联重力
+                    if (zTrans.z > 0.0f || zTrans.vz > 0.0f) {
+                        zTrans.vz += zTrans.gravity * fixedDt;
+                        zTrans.z += zTrans.vz * fixedDt;
+                        if (zTrans.z <= 0.0f) {
+                            zTrans.z = 0.0f;
+                            zTrans.vz = 0.0f;
+                        }
+                    }
+                    // 落地处理
                     if (zTrans.z <= 0.0f) {
-                        zTrans.z = 0.0f;
                         if (world.states.has(entity)) {
                             auto& state = world.states.get(entity);
                             if (state.currentState == CharacterState::KnockedAirborne) {
@@ -978,11 +986,7 @@ factory.spawnThrowableBomb(world, world.player2, world.inputs.get(world.player2)
                                 state.previousState = CharacterState::Idle;
                             }
                         }
-                        if (zTrans.vz < 0.0f && std::abs(zTrans.vz) > 50.0f) {
-                            zTrans.vz = -zTrans.vz * 0.5f;
-                        } else {
-                            zTrans.vz = 0.0f;
-                        }
+                        zTrans.vz = 0.0f;
                     }
                 }
             }

@@ -2,6 +2,7 @@
 #include "core/ECS.h"
 #include "core/GameJuice.h"
 #include "core/InputManager.h"
+#include "core/EventQueue.h"
 #include <vector>
 
 // 所有组件
@@ -14,7 +15,6 @@
 #include "components/AttackState.h"
 #include "components/Lifetime.h"
 #include "components/DamageTag.h"
-#include "components/DamageEventComponent.h"
 #include "components/DeathTag.h"
 #include "components/LootDrop.h"
 #include "components/ItemData.h"
@@ -53,7 +53,6 @@ struct GameWorld {
     ComponentStore<AttackStateComponent>    attackStates;
     ComponentStore<LifetimeComponent>       lifetimes;
     ComponentStore<DamageTag>               damageTags;
-    ComponentStore<DamageEventComponent>    damageEvents;
     ComponentStore<DeathTag>                deathTags;
     ComponentStore<LootDropComponent>       lootDrops;
     ComponentStore<ItemDataComponent>       itemDatas;
@@ -68,6 +67,9 @@ struct GameWorld {
     ComponentStore<DamageTextComponent>     damageTexts;
     ComponentStore<MomentumComponent>       momentums;
     ComponentStore<ThrowableComponent>      throwables;
+
+    // ========== 事件队列（不走 ECS） ==========
+    EventQueue events;
 
     // ========== 全局状态 ==========
     GameJuice juice;

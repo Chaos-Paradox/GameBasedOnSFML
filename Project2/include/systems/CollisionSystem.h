@@ -1,16 +1,24 @@
 #pragma once
 #include "core/GameWorld.h"
-#include <cstdlib>
+#include <cmath>
 #include <iostream>
+#include <unordered_set>
 
 /**
  * @brief 碰撞检测系统（2.5D 圆柱体判定 - 圆形）
+ *
+ * ⚠️ 重构（ECS 纯净原则）：
+ * - 不再通过 world.damageEvents 创建 ECS 实体，改为写入 world.events 事件队列
+ * - hitTargets 由系统内部维护（每帧创建新的 set，不从组件读取/写入）
  */
 class CollisionSystem {
 public:
     void update(GameWorld& world, float dt)
     {
         (void)dt;
+
+        // 每帧重置打击记录（事件不跨帧）
+        frameHitTargets.clear();
 
         auto hitboxEntities = world.hitboxes.entityList();
         auto hurtboxEntities = world.hurtboxes.entityList();
@@ -47,7 +55,9 @@ public:
                 const auto& hurtbox = world.hurtboxes.get(hurtboxEntity);
                 if (hitbox.sourceEntity == INVALID_ENTITY) continue;
 
-                if (hitbox.hitTargets.find(hurtboxEntity) != hitbox.hitTargets.end()) {
+                // 系统内部记录防止多帧重复伤害
+                uint64_t hitKey = (static_cast<uint64_t>(hitboxEntity) << 32) | static_cast<uint64_t>(hurtboxEntity);
+                if (frameHitTargets.count(hitKey)) {
                     std::cout << "[Collision] ⚠️ 跳过重复命中！Hitbox=" << hitboxEntity << " target=" << hurtboxEntity << "\n";
                     continue;
                 }
@@ -92,8 +102,8 @@ public:
                           << " Z 轴相交 attackerZ=" << attackerZ
                           << " victimZ=" << victimZ << "\n";
 
-                HitboxComponent& mutableHitbox = const_cast<HitboxComponent&>(hitbox);
-                mutableHitbox.hitTargets.insert(hurtboxEntity);
+                // 记录本次命中
+                frameHitTargets.insert(hitKey);
 
                 float hitX = (hitboxWorldX + hurtboxWorldX) / 2.0f;
                 float hitY = (hitboxWorldY + hurtboxWorldY) / 2.0f;
@@ -109,6 +119,7 @@ public:
                     knockbackDirY = 0.0f;
                 }
 
+                // 写入事件队列（不创建 ECS 实体）
                 createDamageEvent(world, hitbox, hurtboxEntity, hitbox.sourceEntity,
                     hitX, hitY, knockbackDirX, knockbackDirY,
                     hitbox.knockbackXY, hitbox.knockbackZ);
@@ -117,7 +128,10 @@ public:
     }
 
 private:
-    Entity createDamageEvent(
+    // 系统内部状态：本帧已打击的 (hitbox, target) 对
+    std::unordered_set<uint64_t> frameHitTargets;
+
+    void createDamageEvent(
         GameWorld& world,
         const HitboxComponent& hitbox,
         Entity target, Entity attacker,
@@ -125,13 +139,11 @@ private:
         float knockbackDirX, float knockbackDirY,
         float knockbackXY, float knockbackZ)
     {
-        Entity eventEntity = world.ecs.create();
-
         float randomMultiplier = 0.8f + (static_cast<float>(std::rand()) / RAND_MAX) * 0.4f;
         bool isCritical = (randomMultiplier > 1.1f);
         int actualDamage = static_cast<int>(hitbox.damageMultiplier * randomMultiplier);
 
-        world.damageEvents.add(eventEntity, {
+        world.events.damageEvents.push_back({
             .target = target,
             .actualDamage = actualDamage,
             .hitPosition = {hitX, hitY},
@@ -139,15 +151,12 @@ private:
             .hitDirection = {knockbackDirX, knockbackDirY},
             .knockbackXY = knockbackXY,
             .knockbackZ = knockbackZ,
-            .attacker = attacker,
-            .timestamp = 0.0f
+            .attacker = attacker
         });
 
         std::cout << "[Collision] 伤害事件：target=" << target
                   << " damage=" << actualDamage
                   << " knockbackXY=" << knockbackXY
                   << " knockbackZ=" << knockbackZ << "\n";
-
-        return eventEntity;
     }
 };

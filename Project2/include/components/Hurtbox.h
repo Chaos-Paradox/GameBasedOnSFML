@@ -4,12 +4,10 @@
 
 /**
  * @brief Hurtbox（受击盒）组件 - 2.5D 圆柱体判定
- * 
- * 🔄 重构（精确圆柱体）：
- * - XY 平面：圆形底面（radius）
- * - Z 轴：圆柱体高度（height）+ 底面偏移（zOffset）
- * - 统一视觉锚点：所有渲染以 Hurtbox 底面圆心为基准
- * 
+ *
+ * ⚠️ 重构（ECS 纯净原则）：
+ * - invincibleTime 已移除 → 无敌时间由 HurtState 的 StateMachineComponent.stateTimer 表达
+ *
  * @see AttackSystem - 扇形斩击 vs 圆柱体检测
  * @see VisualSandbox - 渲染层视觉修正
  */
@@ -20,5 +18,4 @@ struct HurtboxComponent {
     Vec2 offset{0.0f, 0.0f};           // 相对于实体中心的局部偏移（像素）
     Faction faction{Faction::None};    // 阵营
     int layer{CollisionLayer::DEFAULT};// 碰撞层级
-    float invincibleTime{0.0f};        // 无敌剩余时间（秒）
 };

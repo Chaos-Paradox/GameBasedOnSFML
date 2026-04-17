@@ -1,9 +1,13 @@
 #pragma once
 #include "core/GameWorld.h"
 #include <cstdlib>
+#include <unordered_set>
 
 /**
  * @brief 掉落生成系统
+ *
+ * ⚠️ 重构（ECS 纯净原则）：
+ * - hasDropped 已从 LootDropComponent 移除 → 由系统内部已处理集合维护
  */
 class LootSpawnSystem {
 public:
@@ -15,10 +19,11 @@ public:
         for (Entity entity : entities) {
             if (!world.lootDrops.has(entity) || !world.transforms.has(entity)) continue;
 
+            // 系统内部防止重复掉落
+            if (hasDroppedSet.count(entity)) continue;
+
             const auto& lootDrop = world.lootDrops.get(entity);
             const auto& transform = world.transforms.get(entity);
-
-            if (lootDrop.hasDropped) continue;
 
             for (int i = 0; i < lootDrop.lootCount; i++) {
                 const auto& entry = lootDrop.lootTable[i];
@@ -58,8 +63,11 @@ public:
                 }
             }
 
-            LootDropComponent& mutableLootDrop = const_cast<LootDropComponent&>(lootDrop);
-            mutableLootDrop.hasDropped = true;
+            // 标记为已处理
+            hasDroppedSet.insert(entity);
         }
     }
+
+private:
+    std::unordered_set<Entity> hasDroppedSet;
 };

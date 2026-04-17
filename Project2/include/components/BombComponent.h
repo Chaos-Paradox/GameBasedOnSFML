@@ -1,18 +1,15 @@
 #pragma once
 
 /**
- * @brief 炸弹组件
- * 
- * ⚠️ 架构设计：
- * - 引信倒计时（3 秒爆炸）
- * - 踢飞状态标记
- * - 配合 ZTransformComponent 实现弹跳物理
- * 
- * @see BombSystem - 炸弹系统
+ * @brief 炸弹组件（纯数据）
+ *
+ * ⚠️ 重构（ECS 纯净原则）：
+ * - fuseTimer: 引信剩余时间 → 描述"当前剩余多少"，是合法状态
+ * - isKicked: 记录"是否被踢飞" → 移除，踢飞状态由 BombSystem 内部维护
+ * - lastPosX/Y: 上一帧位置（历史记录）→ 移除，由 BombSystem 内部保存
+ *
+ * @see BombSystem - 炸弹生命周期管理
  */
 struct BombComponent {
     float fuseTimer{3.0f};    // 引信倒计时（秒）
-    bool isKicked{false};     // 是否被踢飞
-    float lastPosX{0.0f};     // 上一帧位置（用于 CCD 连续碰撞检测）
-    float lastPosY{0.0f};
 };

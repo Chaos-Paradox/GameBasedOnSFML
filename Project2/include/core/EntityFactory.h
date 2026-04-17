@@ -104,7 +104,7 @@ public:
         float baseMoveSpeed = chr.value("baseMoveSpeed", 200.0f);
         world.characters.add(entity, {
             name, level, maxHP, maxHP, baseAttack, baseDefense,
-            baseMoveSpeed, false, 0.0f, 1.0f, 0.0f
+            baseMoveSpeed
         });
 
         // --- InputCommand ---
@@ -121,7 +121,7 @@ public:
         world.hurtboxes.add(entity, {
             .radius = hurtRadius, .height = hurtHeight, .zOffset = zOffset,
             .offset = {0.0f, 0.0f}, .faction = faction,
-            .layer = hurtLayer, .invincibleTime = 0.0f
+            .layer = hurtLayer
         });
 
         // --- Evolution ---
@@ -140,9 +140,10 @@ public:
             .iframeDuration = iframeDuration, .recoveryDuration = recoveryDuration,
             .maxCharges = maxCharges, .currentCharges = maxCharges,
             .rechargeCooldown = rechargeCooldown,
-            .dashTimer = 0.0f, .rechargeTimer = 0.0f, .iframeTimer = 0.0f,
+            .dashTimer = 0.0f, .iframeTimer = 0.0f,
             .recoveryTimer = 0.0f, .dashDir = {1.0f, 0.0f},
-            .isInvincible = false
+            .isInvincible = false,
+            .rechargeTimer = 0.0f
         });
 
         // --- Magnet ---
@@ -172,7 +173,7 @@ public:
         const auto& mom = prefab["momentum"];
         float momMass = mom.value("mass", 100.0f);
         world.momentums.add(entity, {
-            .mass = momMass, .velocity = {0.0f, 0.0f}, .collisionCooldown = 0.0f
+            .mass = momMass, .velocity = {0.0f, 0.0f}, .useCCD = false
         });
 
         return entity;
@@ -210,7 +211,7 @@ public:
         float baseMoveSpeed = chr.value("baseMoveSpeed", 0.0f);
         world.characters.add(entity, {
             name, level, maxHP, maxHP, baseAttack, baseDefense,
-            baseMoveSpeed, false, 0.0f, -1.0f, 0.0f
+            baseMoveSpeed
         });
 
         // --- InputCommand（默认无输入，确保 LocomotionSystem 能清零速度） ---
@@ -225,7 +226,7 @@ public:
         world.hurtboxes.add(entity, {
             .radius = hurtRadius, .height = hurtHeight, .zOffset = zOffset,
             .offset = {0.0f, 0.0f}, .faction = Faction::Enemy,
-            .layer = hurtLayer, .invincibleTime = 0.0f
+            .layer = hurtLayer
         });
 
         // --- LootDrop ---
@@ -233,7 +234,6 @@ public:
         if (loot.contains("entries") && loot["entries"].is_array()) {
             LootDropComponent lootComp;
             lootComp.lootCount = 0;
-            lootComp.hasDropped = false;
             for (const auto& entry : loot["entries"]) {
                 if (lootComp.lootCount >= LootDropComponent::MAX_LOOT_ENTRIES) break;
                 auto& e = lootComp.lootTable[lootComp.lootCount];
@@ -259,7 +259,7 @@ public:
         const auto& mom = prefab.contains("momentum") ? prefab["momentum"] : nlohmann::json{};
         float momMass = mom.value("mass", 100.0f);
         world.momentums.add(entity, {
-            .mass = momMass, .velocity = {0.0f, 0.0f}, .collisionCooldown = 0.0f
+            .mass = momMass, .velocity = {0.0f, 0.0f}, .useCCD = false
         });
 
         // --- ZTransform ---
@@ -316,10 +316,7 @@ public:
 
         // --- Bomb ---
         world.bombs.add(bomb, {
-            .fuseTimer = fuseTimer,
-            .isKicked = false,
-            .lastPosX = spawnX,
-            .lastPosY = spawnY
+            .fuseTimer = fuseTimer
         });
 
         // --- ZTransform ---
@@ -345,15 +342,13 @@ public:
         float momMass = mom.value("mass", 10.0f);
         bool useCCD = mom.value("useCCD", false);
         world.momentums.add(bomb, {
-            .mass = momMass, .velocity = ownerTrans.velocity, .collisionCooldown = 0.08f,
-            .prevPosX = spawnX, .prevPosY = spawnY, .useCCD = useCCD
+            .mass = momMass, .velocity = ownerTrans.velocity, .useCCD = useCCD
         });
 
         // --- Throwable ---
         world.throwables.add(bomb, {
             .owner = owner,
-            .graceTimer = 0.15f,
-            .hasExitedOwner = false
+            .graceTimer = 0.15f
         });
 
         return bomb;
@@ -409,8 +404,7 @@ public:
 
         // --- Lifetime ---
         world.lifetimes.add(explosion, {
-            .timeLeft = expLifetime,
-            .autoDestroy = true
+            .timeLeft = expLifetime
         });
 
         return explosion;

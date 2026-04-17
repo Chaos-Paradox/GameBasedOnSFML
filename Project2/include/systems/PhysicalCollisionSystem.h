@@ -2,12 +2,16 @@
 #include "core/GameWorld.h"
 #include <cmath>
 #include <iostream>
+#include <unordered_map>
 
 /**
  * @brief 物理碰撞系统（圆柱体排斥 + CCD 连续碰撞检测）
  *
- * 质量数据来源：MomentumComponent::mass（不再从 ColliderComponent 读取）
- * 速度数据来源：优先使用 MomentumComponent::velocity，回退到 TransformComponent::velocity
+ * ⚠️ 重构（ECS 纯净原则）：
+ * - collisionCooldown → 由系统内部 collisionCooldowns 映射维护
+ * - prevPosX/Y → 由系统内部 prevPositions 映射维护
+ * - 质量数据来源：MomentumComponent::mass
+ * - 速度数据来源：优先使用 MomentumComponent::velocity，回退到 TransformComponent::velocity
  *
  * CCD 连续碰撞检测：
  *   - 对 useCCD=true 的高速实体（如炸弹），用 prevPos → currentPos 轨迹做射线检测
@@ -20,14 +24,22 @@ public:
     {
         (void)dt;
 
-        // ========== 记录上一帧位置（用于 CCD） ==========
+        // 碰撞冷却递减（系统内部维护）
         auto momentumEntities = world.momentums.entityList();
         for (Entity e : momentumEntities) {
-            if (world.momentums.has(e) && world.transforms.has(e)) {
-                auto& mom = world.momentums.get(e);
+            auto it = collisionCooldowns.find(e);
+            if (it != collisionCooldowns.end() && it->second > 0.0f) {
+                it->second -= dt;
+                if (it->second < 0.0f) it->second = 0.0f;
+            }
+        }
+
+        // ========== 记录上一帧位置（用于 CCD，系统内部维护） ==========
+        auto allEntities = world.transforms.entityList();
+        for (Entity e : allEntities) {
+            if (world.transforms.has(e)) {
                 auto& trans = world.transforms.get(e);
-                mom.prevPosX = trans.position.x;
-                mom.prevPosY = trans.position.y;
+                prevPositions[e] = {trans.position.x, trans.position.y};
             }
         }
 
@@ -48,8 +60,7 @@ public:
                 auto& colliderB = world.colliders.get(entityB);
                 auto& transformB = world.transforms.get(entityB);
 
-                // 炸弹被 Dash 踢飞时，跳过 PhysicalCollisionSystem 的处理
-                // 只由 BombSystem 的 CCD 处理，避免物理推开干扰连续踢
+                // 炸弹被 Dash 踢飞时，跳过 PhysicalCollisionSystem
                 bool aIsBomb = world.bombs.has(entityA);
                 bool bIsBomb = world.bombs.has(entityB);
                 if (aIsBomb || bIsBomb) {
@@ -59,12 +70,11 @@ public:
                                       world.states.get(entityB).currentState == CharacterState::Dash;
                     if (aIsDashing || bIsDashing) continue;
 
-                    // 炸弹刚被踢飞（collisionCooldown > 0）也跳过，避免 dash 过程中被物理推开
+                    // 碰撞冷却检查（系统内部映射）
                     Entity bombEntity = aIsBomb ? entityA : entityB;
-                    if (world.momentums.has(bombEntity) &&
-                        world.momentums.get(bombEntity).collisionCooldown > 0.0f) continue;
+                    auto cdIt = collisionCooldowns.find(bombEntity);
+                    if (cdIt != collisionCooldowns.end() && cdIt->second > 0.0f) continue;
 
-                    // 炸弹速度 > 100px/s 表示正在飞行中，也跳过物理碰撞
                     auto& bombTrans = aIsBomb ? transformA : transformB;
                     float bombSpeed = std::sqrt(bombTrans.velocity.x * bombTrans.velocity.x +
                                                 bombTrans.velocity.y * bombTrans.velocity.y);
@@ -85,8 +95,7 @@ public:
                 float minDist = colliderA.radius + colliderB.radius;
                 if (dist >= minDist) continue;
 
-                // ========== 踢飞豁免期拦截 (Collision Immunity) ==========
-                // 炸弹被踢飞后，在豁免期内无视原踢飞者的刚体碰撞，直接穿透
+                // ========== 踢飞豁免期拦截 ==========
                 {
                     bool skipA = world.throwables.has(entityA) &&
                                  world.throwables.get(entityA).lastKickedBy == entityB &&
@@ -97,19 +106,18 @@ public:
                     if (skipA || skipB) continue;
                 }
 
-                // Z 轴过滤：跳跃中的实体不应与地面实体发生物理排斥
+                // Z 轴过滤
                 float zA = world.zTransforms.has(entityA) ? world.zTransforms.get(entityA).z : 0.0f;
                 float hA = world.zTransforms.has(entityA) ? world.zTransforms.get(entityA).height : 40.0f;
                 float zB = world.zTransforms.has(entityB) ? world.zTransforms.get(entityB).z : 0.0f;
                 float hB = world.zTransforms.has(entityB) ? world.zTransforms.get(entityB).height : 40.0f;
-                if (zA > zB + hB || zA + hA < zB) continue;  // Z 轴不相交，跳过
+                if (zA > zB + hB || zA + hA < zB) continue;
 
                 float overlap = minDist - dist;
                 float invDist = 1.0f / dist;
                 float dirX = dx * invDist;
                 float dirY = dy * invDist;
 
-                // 质量从 MomentumComponent 读取
                 float massA = 1.0f;
                 float massB = 1.0f;
                 if (world.momentums.has(entityA)) massA = world.momentums.get(entityA).mass;
@@ -127,7 +135,6 @@ public:
                     transformA.position.x -= dirX * overlap;
                     transformA.position.y -= dirY * overlap;
 
-                    // 逃逸速度：推开后必须有足够速度远离，否则下一帧摩擦衰减又重叠
                     float friction = std::pow(0.001f, dt);
                     float escapeSpeed = overlap / dt / friction;
                     if (world.momentums.has(entityA)) {
@@ -149,10 +156,6 @@ public:
                     transformB.position.x += dirX * overlap * ratioB;
                     transformB.position.y += dirY * overlap * ratioB;
 
-                    // ========== 重叠碰撞：只做位置推开 + 逃逸速度 ==========
-                    // 推开后必须给足够速度远离，否则下一帧 MovementSystem 摩擦衰减
-                    // (pow(0.001,dt)≈0.77x) 把推开效果抵消，导致玩家追上再次重叠。
-                    // 逃逸速度 = 位移/dt/摩擦，保证衰减后的有效速度 = 推开位移/dt。
                     float friction = std::pow(0.001f, dt);
                     {
                         float dispA = overlap * ratioA;
@@ -178,17 +181,14 @@ public:
             }
         }
 
-        // ========== CCD 连续碰撞检测（防止高速实体隧穿） ==========
+        // ========== CCD 连续碰撞检测 ==========
         resolveCCD(world);
     }
 
 private:
-    /**
-     * @brief CCD 连续碰撞检测
-     *
-     * 对 useCCD=true 的实体，用 prevPos → currentPos 轨迹做线段-圆最近点检测。
-     * 如果轨迹上与静态碰撞体的最近距离 < radiusA + radiusB，则将实体推回到碰撞点。
-     */
+    std::unordered_map<Entity, float> collisionCooldowns;
+    std::unordered_map<Entity, Vec2> prevPositions;
+
     void resolveCCD(GameWorld& world)
     {
         auto momentumEntities = world.momentums.entityList();
@@ -201,12 +201,17 @@ private:
 
             auto& transformA = world.transforms.get(entityA);
 
-            // 轨迹线段：prevPos → currentPos
-            float segX = transformA.position.x - momA.prevPosX;
-            float segY = transformA.position.y - momA.prevPosY;
+            // 使用系统内部保存的 prevPositions
+            auto it = prevPositions.find(entityA);
+            if (it == prevPositions.end()) continue;
+
+            float prevX = it->second.x;
+            float prevY = it->second.y;
+
+            float segX = transformA.position.x - prevX;
+            float segY = transformA.position.y - prevY;
             float segLenSq = segX * segX + segY * segY;
 
-            // 如果实体几乎没有移动，跳过 CCD
             if (segLenSq < 0.001f) continue;
 
             auto colliderEntities = world.colliders.entityList();
@@ -216,33 +221,29 @@ private:
                 if (!world.colliders.has(entityB)) continue;
 
                 auto& colliderB = world.colliders.get(entityB);
-                // 只需要检测与静态碰撞体的 CCD（围栏等）
                 if (!colliderB.isStatic) continue;
 
                 auto& transformB = world.transforms.get(entityB);
 
-                // Z 轴过滤：CCD 同样需要检查 Z 轴相交
                 float zA = world.zTransforms.has(entityA) ? world.zTransforms.get(entityA).z : 0.0f;
                 float hA = world.zTransforms.has(entityA) ? world.zTransforms.get(entityA).height : 40.0f;
                 float zB = world.zTransforms.has(entityB) ? world.zTransforms.get(entityB).z : 0.0f;
                 float hB = world.zTransforms.has(entityB) ? world.zTransforms.get(entityB).height : 40.0f;
-                if (zA > zB + hB || zA + hA < zB) continue;  // Z 轴不相交，跳过
+                if (zA > zB + hB || zA + hA < zB) continue;
 
-                // 计算线段上离 colliderB 中心最近的点
-                float tx = transformB.position.x - momA.prevPosX;
-                float ty = transformB.position.y - momA.prevPosY;
+                float tx = transformB.position.x - prevX;
+                float ty = transformB.position.y - prevY;
                 float t = (tx * segX + ty * segY) / segLenSq;
                 t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
 
-                float closestX = momA.prevPosX + t * segX;
-                float closestY = momA.prevPosY + t * segY;
+                float closestX = prevX + t * segX;
+                float closestY = prevY + t * segY;
 
                 float dx = transformB.position.x - closestX;
                 float dy = transformB.position.y - closestY;
                 float dist = std::sqrt(dx * dx + dy * dy);
 
                 float minDist = colliderB.radius;
-                // 对于动态实体 A，用 MomentumComponent 的 radius 回退
                 float radiusA = 1.0f;
                 if (world.colliders.has(entityA)) {
                     radiusA = world.colliders.get(entityA).radius;
@@ -250,7 +251,6 @@ private:
                 minDist += radiusA;
 
                 if (dist < minDist && dist > 0.001f) {
-                    // ========== 踢飞豁免期拦截 (CCD) ==========
                     bool skipA = world.throwables.has(entityA) &&
                                  world.throwables.get(entityA).lastKickedBy == entityB &&
                                  world.throwables.get(entityA).ignoreKickerTimer > 0.0f;
@@ -259,33 +259,27 @@ private:
                                  world.throwables.get(entityB).ignoreKickerTimer > 0.0f;
                     if (skipA || skipB) continue;
 
-                    // 碰撞！推回到碰撞点
                     float pushBackX = closestX + (dx / dist) * (minDist - 0.01f);
                     float pushBackY = closestY + (dy / dist) * (minDist - 0.01f);
 
                     transformA.position.x = pushBackX;
                     transformA.position.y = pushBackY;
 
-                    // 速度反射（沿碰撞法线）
                     float nx = dx / dist;
                     float ny = dy / dist;
 
                     Vec2 vel = transformA.velocity;
                     float dotVN = vel.x * nx + vel.y * ny;
 
-                    // 只反射朝向碰撞体的速度分量
                     if (dotVN < 0.0f) {
                         transformA.velocity.x -= 2.0f * dotVN * nx;
                         transformA.velocity.y -= 2.0f * dotVN * ny;
-
-                        // 同步 momentum 速度
                         momA.velocity = {transformA.velocity.x, transformA.velocity.y};
                     }
 
                     std::cout << "[Physics/CCD] ⚡ Tunneling prevented! entity=" << (uint32_t)entityA
                               << " pushed to (" << pushBackX << ", " << pushBackY << ")\n";
 
-                    // 一个 CCD 实体每帧只处理一次碰撞
                     break;
                 }
             }

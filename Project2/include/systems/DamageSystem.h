@@ -6,16 +6,20 @@
 
 /**
  * @brief 伤害结算系统
+ *
+ * ⚠️ 重构（ECS 纯净原则）：
+ * - 不再从 world.damageEvents（ECS 组件存储）读取，改为从 world.events.damageEvents（事件队列）读取
+ * - 伤害飘字不再直接创建 LifetimeComponent，改为写入 DamageTextEvent
  */
 class DamageSystem {
 public:
     void update(GameWorld& world, float dt)
     {
         (void)dt;
-        auto entities = world.damageEvents.entityList();
-        for (Entity eventEntity : entities) {
-            const auto& event = world.damageEvents.get(eventEntity);
 
+        // 消费事件队列（不修改 ECS）
+        auto& dmgEvents = world.events.damageEvents;
+        for (const auto& event : dmgEvents) {
             if (event.target == INVALID_ENTITY) continue;
 
             if (world.characters.has(event.target)) {
@@ -41,43 +45,12 @@ public:
                           << (event.isCritical ? " [CRITICAL!]" : "")
                           << " (HP: " << oldHP << " -> " << character.currentHP << ")\n";
 
-                // 生成伤害飘字实体
-                Entity textEntity = world.ecs.create();
-                float randomOffsetX = (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 20.0f - 10.0f;
-
-                world.transforms.add(textEntity, {
-                    .position = {event.hitPosition.x + randomOffsetX, event.hitPosition.y - 40.0f},
-                    .scale = {1.0f, 1.0f},
-                    .rotation = 0.0f,
-                    .velocity = {0.0f, 0.0f},
-                    .facingX = 1.0f,
-                    .facingY = 0.0f
-                });
-
-                world.damageTexts.add(textEntity, {
-                    .text = std::to_string(event.actualDamage) + (event.isCritical ? "!" : ""),
-                    .timer = 1.0f,
-                    .position = {event.hitPosition.x + randomOffsetX, event.hitPosition.y - 40.0f},
-                    .velocity = {0.0f, -50.0f},
+                // 写入伤害飘字事件（不直接创建 ECS 实体）
+                world.events.damageTextEvents.push_back({
+                    .damage = event.actualDamage,
                     .isCritical = event.isCritical,
-                    .alpha = 1.0f,
-                    .fontSize = event.isCritical ? 32.0f : 24.0f,
-                    .fadeOutStart = 0.5f
+                    .position = {event.hitPosition.x, event.hitPosition.y - 40.0f}
                 });
-
-                world.lifetimes.add(textEntity, {
-                    .timeLeft = 0.8f,
-                    .autoDestroy = true
-                });
-
-                world.zTransforms.add(textEntity, {
-                    .z = 50.0f,
-                    .vz = 0.0f,
-                    .gravity = 0.0f,
-                    .height = 10.0f
-                });
-
-                std::cout << "[DamageSystem] 📝 Created damage text! ID=" << (uint32_t)textEntity << " dmg=" << event.actualDamage << "\n";
 
                 // 处理击飞效果
                 if ((event.knockbackXY > 0.0f || event.knockbackZ > 0.0f) &&
@@ -112,14 +85,12 @@ public:
 
                 // GameJuice 打击感触发
                 if (event.knockbackXY > 1000.0f) {
-                    // HEAVY：炸弹爆炸、重击
                     world.juice.hitStopTimer = 0.12f;
                     world.juice.timeScale = 0.0f;
                     world.juice.shakeTimer = 0.3f;
                     world.juice.shakeIntensity = 20.0f;
                     std::cout << "[GameJuice] 💥 HEAVY hit-stop + shake!\n";
                 } else if (event.actualDamage > 0) {
-                    // LIGHT：普通攻击（提升强度让玩家能感知到）
                     world.juice.hitStopTimer = 0.06f;
                     world.juice.timeScale = 0.0f;
                     world.juice.shakeTimer = 0.15f;
@@ -127,9 +98,10 @@ public:
                     std::cout << "[GameJuice] ⚡ Light hit-stop + shake!\n";
                 }
             }
-
-            world.damageEvents.remove(eventEntity);
         }
+
+        // 消费完毕，清空事件队列
+        dmgEvents.clear();
     }
 
 private:

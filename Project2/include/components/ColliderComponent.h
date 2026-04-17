@@ -15,9 +15,4 @@
 struct ColliderComponent {
     float radius{20.0f};    // 圆柱体的底面半径（像素）
     bool isStatic{false};   // 是否是不可推动的死物（墙壁、障碍物）
-
-    // 快速检测：是否为动态实体
-    bool isDynamic() const {
-        return !isStatic;
-    }
 };

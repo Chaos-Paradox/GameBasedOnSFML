@@ -1,9 +1,13 @@
 #pragma once
 #include "core/GameWorld.h"
 #include <cmath>
+#include <unordered_map>
 
 /**
  * @brief 磁力吸附系统
+ *
+ * ⚠️ 重构（ECS 纯净原则）：
+ * - magnetImmunityTimer 已从 ItemDataComponent 移除 → 由系统内部映射维护
  */
 class MagnetSystem {
 public:
@@ -24,14 +28,17 @@ public:
 
                 auto& lootTransform = world.transforms.get(loot);
 
-                auto itemData = world.itemDatas.get(loot);
-                if (itemData.magnetImmunityTimer > 0.0f) {
-                    itemData.magnetImmunityTimer -= dt;
-                    world.itemDatas.add(loot, itemData);
-
-                    lootTransform.velocity.x *= 0.9f;
-                    lootTransform.velocity.y *= 0.9f;
-                    continue;
+                // 磁吸免疫期（系统内部维护，默认 0.25s）
+                auto it = magnetImmunities.find(loot);
+                if (it != magnetImmunities.end()) {
+                    it->second -= dt;
+                    if (it->second <= 0.0f) {
+                        magnetImmunities.erase(it);
+                    } else {
+                        lootTransform.velocity.x *= 0.9f;
+                        lootTransform.velocity.y *= 0.9f;
+                        continue;
+                    }
                 }
 
                 float dx = playerTransform.position.x - lootTransform.position.x;
@@ -50,4 +57,7 @@ public:
             }
         }
     }
+
+private:
+    std::unordered_map<Entity, float> magnetImmunities;
 };

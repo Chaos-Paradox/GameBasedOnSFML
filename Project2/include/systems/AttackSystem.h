@@ -9,6 +9,10 @@
 
 /**
  * @brief 攻击判定系统（扇形几何瞬时扫描）
+ *
+ * ⚠️ 重构（ECS 纯净原则）：
+ * - hasFiredDamage 已移除 → 攻击结束由 StateMachineSystem 移除 AttackStateComponent 表达
+ * - 伤害事件写入 world.events.damageEvents（事件队列），不创建 ECS 实体
  */
 class AttackSystem {
 public:
@@ -32,7 +36,6 @@ public:
                     state.currentState = CharacterState::Idle;
                     state.previousState = CharacterState::Idle;
                     state.stateTimer = 0.0f;
-                    attackState.hasFiredDamage = false;
                     std::cout << "[AttackSystem] Attack finished! Released to Idle.\n";
                     continue;
                 }
@@ -42,7 +45,6 @@ public:
                     transform.velocity = {0.0f, 0.0f};
                 }
 
-                if (attackState.hasFiredDamage) continue;
                 if (!world.transforms.has(entity)) continue;
 
                 const auto& transform = world.transforms.get(entity);
@@ -50,8 +52,6 @@ public:
                 float py = transform.position.y;
                 float facingX = transform.facingX;
                 float facingY = transform.facingY;
-
-                attackState.hasFiredDamage = true;
 
                 float halfArcRad = (attackState.attackArc / 2.0f) * (M_PI / 180.0f);
                 float cosThreshold = std::cos(halfArcRad);
@@ -126,13 +126,12 @@ public:
                     if (dotProduct >= cosThreshold) {
                         std::cout << " → HIT ✅\n";
 
-                        // ← 【修复】伤害浮动 0.8x ~ 1.2x & 暴击判定（与 CollisionSystem 一致）
                         float randomMultiplier = 0.8f + (static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX)) * 0.4f;
                         bool isCritical = (randomMultiplier > 1.1f);
                         int actualDamage = static_cast<int>(attackState.baseDamage * randomMultiplier);
 
-                        Entity eventEntity = world.ecs.create();
-                        world.damageEvents.add(eventEntity, {
+                        // 写入事件队列（不创建 ECS 实体）
+                        world.events.damageEvents.push_back({
                             .target = victim,
                             .actualDamage = actualDamage,
                             .hitPosition = {vx, vy},
@@ -140,8 +139,7 @@ public:
                             .hitDirection = {dirX, dirY},
                             .knockbackXY = 800.0f,
                             .knockbackZ = 200.0f,
-                            .attacker = entity,
-                            .timestamp = 0.0f
+                            .attacker = entity
                         });
                     } else {
                         std::cout << " → OUTSIDE ARC ❌\n";

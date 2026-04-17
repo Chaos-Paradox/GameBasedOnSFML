@@ -1,11 +1,15 @@
 #pragma once
 #include "core/GameWorld.h"
 #include "components/InputCommand.h"
-#include "components/DamageEventComponent.h"
 #include "components/AttackState.h"
+#include <iostream>
 
 /**
  * @brief 状态机系统
+ *
+ * ⚠️ 重构（ECS 纯净原则）：
+ * - 不再直接遍历 world.damageEvents（ECS），改为检查 world.events.damageEvents（事件队列）
+ * - hasFiredDamage 已从 AttackStateComponent 移除 → 用 attackState.hitTimer 判断
  *
  * ⚠️ 工业级架构 - 单轨覆盖指令槽：
  * 1. 获取组件数据
@@ -59,7 +63,8 @@ public:
                 const bool hasAttackState = world.attackStates.has(entity);
                 if (hasAttackState) {
                     const auto& attackState = world.attackStates.get(entity);
-                    if (attackState.hasFiredDamage && attackState.hitTimer <= 0.1f) {
+                    // 重构：不再依赖 hasFiredDamage，用 hitTimer 判断
+                    if (attackState.hitTimer <= 0.1f) {
                         canCancelAttack = true;
                     }
                 }
@@ -73,9 +78,7 @@ public:
 
             // --- 最高优先级：受伤事件（强制打断）---
             bool isHit = false;
-            auto eventEntities = world.damageEvents.entityList();
-            for (Entity eventEntity : eventEntities) {
-                const auto& event = world.damageEvents.get(eventEntity);
+            for (const auto& event : world.events.damageEvents) {
                 if (event.target == entity) {
                     isHit = true;
                     break;
@@ -131,7 +134,6 @@ public:
                 AttackStateComponent newAttackState;
                 newAttackState.hitTimer = 0.15f;
                 newAttackState.hitDuration = 0.15f;
-                newAttackState.hasFiredDamage = false;
                 world.ecs.addComponent<AttackStateComponent>(entity, world.attackStates, newAttackState);
 
                 std::cout << "[StateMachine] 🗡️ 攻击意图消费！pendingIntent=Attack\n";

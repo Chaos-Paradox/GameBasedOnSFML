@@ -2,19 +2,15 @@
 #include "core/GameWorld.h"
 #include <vector>
 #include <algorithm>
+#include <iostream>
 
 /**
  * @brief 清理系统（延迟销毁 + 孟婆汤）
  *
- * ⚠️ 架构设计：
- * - 在帧末统一清理所有带 DeathTag 的实体
- * - 清理到期的 Lifetime 实体
- * - 【核心】销毁前清空所有组件数据（防止实体复用污染）
- * - 防止 std::out_of_range 崩溃
+ * ⚠️ 重构（ECS 纯净原则）：
+ * - LifetimeComponent.autoDestroy 已移除 → 所有到期 Lifetime 实体统一销毁
  *
  * 执行时机：主循环最末尾（渲染之后）
- *
- * ✅ 重构后：从 26 个参数 → GameWorld& world + float dt
  */
 class CleanupSystem {
 public:
@@ -38,7 +34,7 @@ public:
             auto& lifetime = world.lifetimes.get(entity);
             lifetime.timeLeft -= dt;
 
-            if (lifetime.timeLeft <= 0.0f && lifetime.autoDestroy) {
+            if (lifetime.timeLeft <= 0.0f) {
                 if (std::find(entitiesToDestroy.begin(), entitiesToDestroy.end(), entity) == entitiesToDestroy.end()) {
                     entitiesToDestroy.push_back(entity);
                 }
@@ -47,7 +43,6 @@ public:
 
         // ========== 2. 统一执行抹除与销毁 ==========
         for (Entity entity : entitiesToDestroy) {
-            // 灌入孟婆汤：清空所有组件数据
             world.states.remove(entity);
             world.transforms.remove(entity);
             world.characters.remove(entity);
@@ -69,10 +64,11 @@ public:
             world.colliders.remove(entity);
             world.zTransforms.remove(entity);
             world.damageTexts.remove(entity);
+            world.throwables.remove(entity);
+            world.momentums.remove(entity);
 
             std::cout << "[CLEANUP] 🧹 Wiping and Destroying ID: " << (uint32_t)entity << std::endl;
 
-            // 抹除所有记忆后，安全销毁 ID
             world.ecs.destroy(entity);
         }
     }
